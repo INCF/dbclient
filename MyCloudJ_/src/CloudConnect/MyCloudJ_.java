@@ -1,13 +1,14 @@
 package CloudConnect;
+
 /*
- * Description		:		Google Summer of Code 2014 Project
+ * Description		:		Google Summer of Code 2014 Project 
  * Organization		:		International Neuroinformatics Coordinating Facility, Belgian Node
  * Author			:		Atin Mathur (mathuratin007@gmail.com), (atin.mathur@lnmiit.ac.in)
  * Mentor			: 		Dimiter Prodanov
  * Project Title	:		Dropbox Client for ImageJ (Image Processing Software in java)
  * FileName			:		MyCloudJ_.java (package CloudConnect)
  * 							ImageJ Plugin for Dropbox Client. Uses the DbxUtility.java of package DbxUtils to access 
- * 							the User's Dropbox Accounts  
+ * 							the User's Dropbox Accounts and perform download and upload actions.
  * 
  * Users			:		Image Processing Researchers (Neuroscientists etc.)
  * Motivation		:		To facilitate the sharing of datasets on among ImageJ users
@@ -17,17 +18,26 @@ package CloudConnect;
  * Requirements		:		ImageJ alongwith JRE 1.7 or later.
  * Date				:		19-May-2014
  */
+
+
+/*
+ * Java libraries used in this plugin  AWT ,Swing, Dropbox Core APIs, ImageJ APIs etc.
+ */
 import java.awt.Desktop; 
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 
+
 import javax.swing.BoxLayout;
+import javax.swing.ButtonGroup;
 import javax.swing.JButton;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
@@ -35,30 +45,35 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JRadioButton;
 import javax.swing.JSeparator;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 
+
 import com.dropbox.core.*;
+
 
 import ij.plugin.*;
 import DbxUtils.*;
 
 public class MyCloudJ_ implements PlugIn {
 	/*
-	 *  Class variables
+	 *  class variables :  For easy access throughout the plugin source code.
 	 */
 	private String code;
 	private String authorizeUrl;
-	private String downloadFileDetails, uploadFileDetails;
 	private DbxUtility obj = new DbxUtility();
-	private int enableBtn = 0;
 	private int userStatus = 0;
-	private String usrInfo;
-	private String displayInstructions;
+	private String userName="", country="", userQuota="";
+	private String displayInstructions="";
+	private String TargetLocalPath = ".", TargetDbxPath = "/";
+	private String FileDbxPath = "", FolderDbxPath="/";
+	private String FileLocalPath = "", FolderLocalPath=".";
+	
 	
 	/*
-	 * Instructions for the user to Connect the Plugin to their Dropbox Accounts
+	 * String variables	:	To store instructions displayed for the user's help.
 	 */
 	private String heading = "  Instructions : \n \n";
 	private String step1 = "  1. Click the \"Access Dropbox !\" button below. It will open the Dropbox app URL in the default browser.\n \n";
@@ -67,6 +82,7 @@ public class MyCloudJ_ implements PlugIn {
 	private String step4 = "  4. Copy the \"access code\" and paste it in the text field below.\n \n";
 	private String step5 = "  5. Click the \"Connect !\" button. You can now access Dropbox.\n \n";
 	private String note1 = "  Note: Enter the correct access code!";
+	
 	
 	/*
 	 * (non-Javadoc)
@@ -77,55 +93,42 @@ public class MyCloudJ_ implements PlugIn {
     @SuppressWarnings("deprecation")
 	public void run(String arg) {
 		/*
-		 *  Create a JFrame that contains the whole GUI for the MyCloudJ_ plugin
+		 *  A JFrame that contains the whole GUI for the MyCloudJ_ plugin
 		 */
 		final JFrame mainFrame = new JFrame();
 		BoxLayout boxLayout = new BoxLayout(mainFrame.getContentPane(), BoxLayout.Y_AXIS);
 		mainFrame.setLayout(boxLayout);
-		mainFrame.setMaximumSize(new Dimension(800,800));
+		mainFrame.setMaximumSize(new Dimension(700,500));
         mainFrame.setTitle("CloudConnect - MyCloudJ");
-        mainFrame.setSize(800,800);
+        mainFrame.setSize(700,500);
       
+        
         /*
          * This will position the JFrame in the center of the screen
          */
         mainFrame.setLocationRelativeTo(null);
         
-        /* Create the Menu bar.
-         * 
-         * 2 Menus will be required:
-         * 
-         * 1. Download -> 2 Menu items: a. File, b. Folder
-         * 
-         * 2. Upload -> 2 Menu items: a. File, b. Folder
+        
+        /* 
+         * To Create the Menu bar : Actions	:	a. Download, b. Upload
          */
         JMenuBar menubar = new JMenuBar();
         
-        final JMenu downloadMenu = new JMenu("Download");
-        downloadMenu.add(new JSeparator());
-        downloadMenu.disable();
+        final JMenu actionsMenu = new JMenu("Actions");
+        actionsMenu.add(new JSeparator());
+        actionsMenu.disable();
         
-        final JMenu uploadMenu = new JMenu("Upload");
-        uploadMenu.add(new JSeparator());
-        uploadMenu.disable();
+        JMenuItem actionItem1 = new JMenuItem("Download");
+        JMenuItem actionItem2 = new JMenuItem("Upload");
         
-        JMenuItem downloadItem1 = new JMenuItem("File");
-        JMenuItem downloadItem2 = new JMenuItem("Folder");
+        actionsMenu.add(actionItem1);
+        actionsMenu.add(actionItem2);
         
-        JMenuItem uploadItem1 = new JMenuItem("File");
-        JMenuItem uploadItem2 = new JMenuItem("Folder");
-        
-        downloadMenu.add(downloadItem1);
-        downloadMenu.add(downloadItem2);
-        
-        uploadMenu.add(uploadItem1);
-        uploadMenu.add(uploadItem2);
-        
-        menubar.add(downloadMenu);
-        menubar.add(uploadMenu);
+        menubar.add(actionsMenu);
         
         mainFrame.setJMenuBar(menubar);
   
+        
         /*
          *  JPanels for better alignment of Components in JFrame
          */
@@ -135,6 +138,7 @@ public class MyCloudJ_ implements PlugIn {
         JPanel panel4 = new JPanel(new FlowLayout());
         JPanel panel5 = new JPanel(new FlowLayout());
         
+        
         /*
          *  Add JTextArea -> Instructions for the user
          */
@@ -143,10 +147,14 @@ public class MyCloudJ_ implements PlugIn {
         instructions.setEditable(false);
         panel1.add(instructions);
 
+        
+        
         /*
          * Add JButton -> Access the Dropbox! button
          */
         final JButton accessDbxButton = new JButton("Access Dropbox  !");
+        panel2.add(accessDbxButton);
+        
         
         /*
          * Add JLabel -> Access Code
@@ -154,6 +162,7 @@ public class MyCloudJ_ implements PlugIn {
         JLabel lbl1;
         lbl1 = new JLabel("Dropbox Access Code: ");
         panel3.add(lbl1);
+        
         
         /*
          *  Add JTextField -> Users will have to paste the copied Access code here
@@ -163,6 +172,7 @@ public class MyCloudJ_ implements PlugIn {
         accessCode.enable(false);
         panel3.add(accessCode);
         
+        
         /*
          * Add JButton -> Connect to Dropbox button
          */
@@ -170,19 +180,22 @@ public class MyCloudJ_ implements PlugIn {
         btnConnect.disable();
         panel3.add(btnConnect);
         
+        
         /*
          *  Add JLabel for user status -> connected or not connected
          */
         final JLabel lblStatus = new JLabel("Not Connected !");
         panel4.add(lblStatus);
 
+        
         /*
          *  Add JTextArea -> User Information
          */
-		usrInfo ="hello";
-        final JTextArea userInfo = new JTextArea(usrInfo);
+       
+        final JTextArea userInfo = new JTextArea("");
         userInfo.setEditable(false);
         panel5.add(userInfo);	
+        
         
         /*
          *  Event Handling for btnConnect
@@ -192,25 +205,26 @@ public class MyCloudJ_ implements PlugIn {
 			public void actionPerformed(ActionEvent e) {
 				try {
 					code = accessCode.getText();
-					if(enableBtn == 1 && userStatus == 0 && !code.equals(null)) {
+					if(userStatus == 0 && !code.equals("")) {
 					obj.DbxLinkUser(code);
-					//IJ.error("Linked account: " + obj.client.getAccountInfo().displayName);
-					enableBtn = 0;
-					lblStatus.setText("Connected as "+obj.client.getAccountInfo().displayName);
-					usrInfo = obj.client.getAccountInfo().toStringMultiline();
-					userInfo.setText(usrInfo);
-					accessCode.disable();
-					downloadMenu.enable();
-					uploadMenu.enable();
 					userStatus = 1;
+					userName = obj.client.getAccountInfo().displayName;
+					country = obj.client.getAccountInfo().country;
+					userQuota += (double)obj.client.getAccountInfo().quota.total/(1024*1024*1024);
+					lblStatus.setText("Connected as "+userName);
+					userInfo.setText("Username: "+userName+"\nCountry: "+country+"\nQuota: "+userQuota+" GB");
+					accessCode.disable();
+					actionsMenu.enable();
 					}
 					else if(userStatus == 1)
 						JOptionPane.showMessageDialog(mainFrame, "Already connected !", "MyCLoudJ - Already Connected", JOptionPane.WARNING_MESSAGE);
-					else
+					else if(userStatus == 0 && code.equals(""))
 						JOptionPane.showMessageDialog(mainFrame, "Enter Access Code !", "MyCLoudJ - Enter Access code", JOptionPane.WARNING_MESSAGE);
 				} catch (IOException e1) {
+					JOptionPane.showMessageDialog(mainFrame, "Access code error - Re-enter the correct access code !\n"+e1.getMessage(), "MyCLoudJ - Access Code Error", JOptionPane.ERROR_MESSAGE);
 					e1.printStackTrace();
 				} catch (DbxException e1) {
+					JOptionPane.showMessageDialog(mainFrame, "Access code error - Re-enter the correct access code !\n"+e1.getMessage(), "MyCLoudJ - Access Code Error", JOptionPane.ERROR_MESSAGE);
 					e1.printStackTrace();
 				}
 			}
@@ -223,98 +237,344 @@ public class MyCloudJ_ implements PlugIn {
         accessDbxButton.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				if(userStatus == 0){
+					/*
+					 *  Generate the authorize URL
+					 */
+					try {
+						authorizeUrl = obj.DbxLogin();
+					} catch (IOException | DbxException e4) {
+						// TODO Auto-generated catch block
+						e4.printStackTrace();
+					}
+					// Instructions for the User are in stepsToAuthorize.
+					openDefaultBrowser(authorizeUrl);
+					accessCode.enable(true);
+				}
+				else {
+					JOptionPane.showMessageDialog(mainFrame, "Already connected !", "MyCLoudJ - Already Connected", JOptionPane.WARNING_MESSAGE);
+				}
+			}
+		});
+      
+        
+        /*
+         * Add action listener for downloading the File/Folder from the user's Dropbox Account. (Actions -> Download)
+         */
+        actionItem1.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
 				/*
-				 *  Generate the authorize URL
+				 * Inner JFrame : Download Frame
 				 */
-				try {
-					authorizeUrl = obj.DbxLogin();
-				} catch (IOException | DbxException e4) {
-					// TODO Auto-generated catch block
-					e4.printStackTrace();
-				}
-				// Instructions for the User are in stepsToAuthorize.
-				openDefaultBrowser(authorizeUrl);
-				accessCode.enable(true);
-				enableBtn = 1;
+				final JFrame downloadFrame = new JFrame();
+				BoxLayout boxLayout = new BoxLayout(downloadFrame.getContentPane(), BoxLayout.Y_AXIS);
+				downloadFrame.setLayout(boxLayout);
+				
+				
+				 /*
+		         * This will position the JFrame in the center of the screen
+		         */
+		        downloadFrame.setLocationRelativeTo(null);
+		        
+				downloadFrame.setMaximumSize(new Dimension(500,250));
+		        downloadFrame.setTitle("CloudConnect - MyCloudJ: Download");
+		        downloadFrame.setSize(500,250);
+		        
+		        
+		        /*
+		         * Inner JPanels for frame2
+		         */
+		        JPanel innerPanel1 = new JPanel(new FlowLayout());
+		        JPanel innerPanel2 = new JPanel(new FlowLayout());
+		        JPanel innerPanel3 = new JPanel(new FlowLayout());
+		        JPanel innerPanel4 = new JPanel(new FlowLayout());
+		        
+		        
+		        /*
+		         * 
+		         */
+		        JLabel type = new JLabel("Type: ");
+		        innerPanel1.add(type);
+		        
+		        
+		        /*
+		         * JRadioButtons -> For selecting the action on File or Folder.
+		         */
+		        final JRadioButton rButton1 = new JRadioButton("File");
+		        final JRadioButton rButton2 = new JRadioButton("Folder", true);
+		        ButtonGroup group = new ButtonGroup();
+		        group.add(rButton1);
+		        group.add(rButton2);
+		        innerPanel1.add(rButton1);
+		        innerPanel1.add(rButton2);
+		        
+		        
+		        /*
+		         * Jlabel -> Source
+		         */
+		        JLabel srcLbl = new JLabel("Source: ");
+		        innerPanel2.add(srcLbl);
+		        
+		        
+		        /*
+		         * JTextField -> source address : Dropbox address -> currently user will have to enter it manually
+		         */
+		        final JTextField srcTxt = new JTextField(FolderDbxPath,25);
+		        innerPanel2.add(srcTxt);
+		        
+		        
+		        /*
+		         * JButton -> Button to open file chooser for the source file
+		         */
+		        JButton btnFileChooser1 = new JButton("Browse");
+		        innerPanel2.add(btnFileChooser1);
+		        
+		        
+		        /*
+		         * Jlabel -> Target
+		         */
+		        JLabel targetLbl = new JLabel("Target: ");
+		        innerPanel3.add(targetLbl);
+		        
+		        
+		        /*
+		         * JTextField -> source address : Dropbox address -> currently user will have to enter it manually
+		         */
+		        final JTextField targetTxt = new JTextField(TargetLocalPath,25);
+		        innerPanel3.add(targetTxt);
+		        	
+		        
+		        /*
+		         * JButton -> Button to open the file chooser for the target file
+		         */
+		        JButton btnFileChooser2 = new JButton("Browse");
+		        innerPanel3.add(btnFileChooser2);
+		        btnFileChooser2.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						// TODO Auto-generated method stub
+						JFileChooser chooser= new JFileChooser(new File("."));
+						chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+						int choice = chooser.showOpenDialog(chooser);
+						if (choice != JFileChooser.APPROVE_OPTION) return;
+						File chosenFile = chooser.getSelectedFile();
+						targetTxt.setText(chosenFile.getAbsolutePath());
+						targetTxt.setEditable(false);
+					}
+				});
+		        
+		        
+		        /*
+		         * JButton -> To Download the File/Folder from the Source to Target Destination
+		         */
+		        JButton btnDownload = new JButton("Download");
+		        innerPanel4.add(btnDownload);
+		        btnDownload.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						// TODO Auto-generated method stub
+						TargetLocalPath = targetTxt.getText();
+						if(rButton1.isSelected()) {
+							try {
+								FileDbxPath = srcTxt.getText();
+								obj.DbxDownloadFile(FileDbxPath, TargetLocalPath);
+								} catch (IOException | DbxException e1) {
+									// TODO Auto-generated catch block
+									JOptionPane.showMessageDialog(downloadFrame, "Download Aborted !\n"+e1.getMessage(), "MyCLoudJ - Download Aborted", JOptionPane.ERROR_MESSAGE);
+									e1.printStackTrace();
+								}
+						}
+						else if (rButton2.isSelected()) {
+							try {
+								FolderDbxPath = srcTxt.getText();
+								obj.DbxDownloadFolder(FolderDbxPath, TargetLocalPath);
+							} catch (DbxException e1) {
+								// TODO Auto-generated catch block
+								JOptionPane.showMessageDialog(downloadFrame, "Download Aborted !\n"+e1.getMessage(), "MyCLoudJ - Download Aborted", JOptionPane.ERROR_MESSAGE);
+								e1.printStackTrace();
+							} 
+						}
+						JOptionPane.showMessageDialog(downloadFrame, "Download Complete !", "MyCLoudJ - Download Complete", JOptionPane.INFORMATION_MESSAGE);
+					}
+				});
+		        
+		        /*
+		         * This will position the JFrame in the center of the screen
+		         */
+		        downloadFrame.setLocationRelativeTo(null);
+		        
+		        downloadFrame.add(innerPanel1);
+		        downloadFrame.add(innerPanel2);
+		        downloadFrame.add(innerPanel3);
+		        downloadFrame.add(innerPanel4);
+		        
+		        downloadFrame.setVisible(true);
 			}
 		});
-        panel2.add(accessDbxButton);
+        
         
         /*
-         * Add action listener for downloading the File from the user's Dropbox Account. (Download -> File)
+         * Add action listener for downloading the File from the user's Dropbox Account. (Actions -> Download)
          */
-        downloadItem1.addActionListener(new ActionListener() {
+        actionItem2.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				// TODO Auto-generated method stub
-				String FileDbxPath = "/ICPR2012/ATIN/activeContour.cpp";
-				String TargetLocalPath = "/Users/mathuratin/Desktop/activeContours.cpp";
-				try {
-				obj.DbxDownloadFile(FileDbxPath, TargetLocalPath);
-				System.out.println(downloadFileDetails);
-				} catch (IOException | DbxException e1) {
-					// TODO Auto-generated catch block
-					e1.printStackTrace();
-				}
+				/*
+				 * Inner JFrame	:	Upload Frame
+				 */
+				final JFrame uploadFrame = new JFrame();
+				BoxLayout boxLayout = new BoxLayout(uploadFrame.getContentPane(), BoxLayout.Y_AXIS);
+				uploadFrame.setLayout(boxLayout);
+				
+				
+				 /*
+		         * This will position the JFrame in the center of the screen
+		         */
+		        uploadFrame.setLocationRelativeTo(null);
+		        
+		        uploadFrame.setMaximumSize(new Dimension(500,250));
+		        uploadFrame.setTitle("CloudConnect - MyCloudJ: Upload");
+		        uploadFrame.setSize(500,250);
+		        
+		        
+		        /*
+		         * Inner JPanels for frame2
+		         */
+		        JPanel innerPanel1 = new JPanel(new FlowLayout());
+		        JPanel innerPanel2 = new JPanel(new FlowLayout());
+		        JPanel innerPanel3 = new JPanel(new FlowLayout());
+		        JPanel innerPanel4 = new JPanel(new FlowLayout());
+		        
+		        
+		        /*
+		         * 
+		         */
+		        JLabel type = new JLabel("Type: ");
+		        innerPanel1.add(type);
+		        
+		        
+		        /*
+		         * JRadioButtons -> For selecting the action on File or Folder.
+		         */
+		        final JRadioButton rButton1 = new JRadioButton("File");
+		        final JRadioButton rButton2 = new JRadioButton("Folder", true);
+		        ButtonGroup group = new ButtonGroup();
+		        group.add(rButton1);
+		        group.add(rButton2);
+		        innerPanel1.add(rButton1);
+		        innerPanel1.add(rButton2);
+		        
+		        
+		        /*
+		         * Jlabel -> Source
+		         */
+		        JLabel srcLbl = new JLabel("Source: ");
+		        innerPanel2.add(srcLbl);
+		        
+		        
+		        /*
+		         * JTextField -> source address : Local Machine Address-> currently user will have to enter it manually
+		         */
+		        final JTextField srcTxt = new JTextField(FolderLocalPath, 25);
+		        innerPanel2.add(srcTxt);
+		        
+		        
+		        /*
+		         * JButton -> Button to open file chooser for the source file
+		         */
+		        JButton btnFileChooser1 = new JButton("Browse");
+		        innerPanel2.add(btnFileChooser1);
+		        
+		        
+		        /*
+		         * Jlabel -> Target
+		         */
+		        JLabel targetLbl = new JLabel("Target: ");
+		        innerPanel3.add(targetLbl);
+		        
+		        
+		        /*
+		         * JTextField -> source address : Dropbox address -> currently user will have to enter it manually
+		         */
+		        final JTextField targetTxt = new JTextField(TargetDbxPath,25);
+		        innerPanel3.add(targetTxt);
+		        
+		        
+		        /*
+		         * JButton -> Button to open the file chooser for the target file
+		         */
+		        JButton btnFileChooser2 = new JButton("Browse");
+		        innerPanel3.add(btnFileChooser2);
+		        
+		        
+		        btnFileChooser1.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						// TODO Auto-generated method stub
+						JFileChooser chooser= new JFileChooser(new File("."));
+						if(rButton2.isSelected())
+							chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+						int choice = chooser.showOpenDialog(chooser);
+						if (choice != JFileChooser.APPROVE_OPTION) return;
+						File chosenFile = chooser.getSelectedFile();
+						srcTxt.setText(chosenFile.getAbsolutePath());
+					}
+				});
+		        
+		        
+		        /*
+		         * JButton -> To Download the File/Folder from the Source to Target Destination
+		         */
+		        JButton btnUpload = new JButton("Upload");
+		        innerPanel4.add(btnUpload);
+		        btnUpload.addActionListener(new ActionListener() {
+					@Override
+					public void actionPerformed(ActionEvent e) {
+						// TODO Auto-generated method stub
+						if(rButton1.isSelected()) {
+							try {
+								FileLocalPath = srcTxt.getText();
+								String fileName = FileLocalPath.substring(FileLocalPath.lastIndexOf("/"));
+								TargetDbxPath = targetTxt.getText();
+								TargetDbxPath += fileName;
+								obj.DbxUploadFile(FileLocalPath, TargetDbxPath);
+								} catch (IOException | DbxException e1) {
+									// TODO Auto-generated catch block
+									JOptionPane.showMessageDialog(uploadFrame, "Upload Aborted !\n"+e1.getMessage(), "MyCLoudJ - Upload Aborted", JOptionPane.ERROR_MESSAGE);
+									e1.printStackTrace();
+								}
+						}
+						else if (rButton2.isSelected()) {
+								try {
+									FolderLocalPath = srcTxt.getText();
+									TargetDbxPath = targetTxt.getText();
+									obj.DbxUploadFolder(FolderLocalPath, TargetDbxPath);
+								} catch (IOException | DbxException e1) {
+									// TODO Auto-generated catch block
+									JOptionPane.showMessageDialog(uploadFrame, "Upload Aborted !\n"+e1.getMessage(), "MyCLoudJ - Upload Aborted", JOptionPane.ERROR_MESSAGE);
+									e1.printStackTrace();
+								}
+						}
+						JOptionPane.showMessageDialog(uploadFrame, "Upload Complete !", "MyCLoudJ - Upload Complete", JOptionPane.INFORMATION_MESSAGE);
+					}
+				});
+		        
+		        /*
+		         * This will position the JFrame in the center of the screen
+		         */
+		        uploadFrame.setLocationRelativeTo(null);
+		        
+		        uploadFrame.add(innerPanel1);
+		        uploadFrame.add(innerPanel2);
+		        uploadFrame.add(innerPanel3);
+		        uploadFrame.add(innerPanel4);
+		        
+		        uploadFrame.setVisible(true);
 			}
 		});
         
-        
-        /*
-         * Add action listener for downloading the Folder from the user's Dropbox Account. (Download -> Folder)
-         */
-        downloadItem2.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				// TODO Auto-generated method stub
-				try {
-					obj.DbxDownloadFolder("/a", "/Users/mathuratin/Desktop");
-				} catch (DbxException e1) {
-					// TODO Auto-generated catch block
-					e1.printStackTrace();
-				}
-			}
-		});
-        
-        
-        /*
-         * Add action listener for uploading the File to the user's Dropbox Account. (Upload -> File)
-         */
-        uploadItem1.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				// TODO Auto-generated method stub
-				String filename = "/Users/mathuratin/Desktop/Byte of VIM.pdf";
-				String DbxTargetPath = "/test/a.pdf";
-				try {
-					obj.DbxUploadFile(filename, DbxTargetPath);
-					System.out.println(uploadFileDetails);
-				} catch (IOException | DbxException e1) {
-					// TODO Auto-generated catch block
-					e1.printStackTrace();
-				}
-			}
-		});
-        
-        
-        /*
-         * Add action listener for uploading the Folder to the user's Dropbox Account. (Upload -> Folder)
-         */
-        uploadItem2.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				// TODO Auto-generated method stub
-				String FolderLocalPath = "/Users/mathuratin/Desktop/DropBoxClient";
-				String TargetDbxPath = "/a";
-				try {
-					obj.DbxUploadFolder(FolderLocalPath, TargetDbxPath);
-				} catch (IOException | DbxException e1) {
-					// TODO Auto-generated catch block
-					e1.printStackTrace();
-				}
-			}
-		});
-        
+   
         mainFrame.add(panel1);
         mainFrame.add(panel2);
         mainFrame.add(panel3);

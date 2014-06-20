@@ -1,4 +1,5 @@
 package DbxUtils;
+
 /*
  * Description		:		Google Summer of Code 2014 Project
  * Organization		:		International Neuroinformatics Coordinating Facility (INCF), Belgian Node
@@ -16,9 +17,8 @@ package DbxUtils;
  * Requirements		:		ImageJ alongwith JRE 1.7 or later. 
  * Date				:		19-May-2014
  */
-import com.dropbox.core.*;
 
-import ij.IJ;
+import com.dropbox.core.*;
 
 import java.io.*;
 import java.util.Iterator;
@@ -110,7 +110,9 @@ public class DbxUtility {
 		 * where the "File" has to be saved.
 		 */
 		public void DbxDownloadFile(String FileDbxPath, String TargetLocalPath) throws IOException, DbxException {
-	        File SaveAsFile = new File(TargetLocalPath);
+			String fileName = FileDbxPath.substring(FileDbxPath.lastIndexOf("/"));
+			TargetLocalPath += fileName;
+			File SaveAsFile = new File(TargetLocalPath);
 	        OutputStream outputStream = new FileOutputStream(SaveAsFile);
 	        try {
 	        @SuppressWarnings("unused")
@@ -128,18 +130,19 @@ public class DbxUtility {
 			/*
 			 * Create the folder in the local machine
 			 */
-			String FullPath = TargetLocalPath+FolderDbxPath+"/"; 
-			boolean newFolder = new File(FullPath).mkdirs();
-			if(!newFolder)
-				System.out.println("Could not create a new folder");
-
+			String folderName = FolderDbxPath.substring(FolderDbxPath.lastIndexOf("/"));
+			TargetLocalPath += folderName;
+			boolean newFolder = new File(TargetLocalPath).mkdirs();
+			if(!newFolder) {
+				//System.out.println("Could not create a new folder");
+			}
 			/*
 			 * Function to get the metadata of the folder you wish to download
 			 */
 			DbxEntry.WithChildren folderInfo = client.getMetadataWithChildren(FolderDbxPath);
 			Iterator<DbxEntry> iterChildren;
 			 if (folderInfo == null) {
-			     IJ.error("No file or folder at that path.");
+			    // IJ.error("No file or folder at that path.");
 			 } else {				 
 				 iterChildren = folderInfo.children.iterator();
 				 @SuppressWarnings("unused")
@@ -151,7 +154,7 @@ public class DbxUtility {
 						DbxDownloadFolder(child.path, TargetLocalPath);
 					else if(child.isFile()) {
 						try {
-							DbxDownloadFile(child.path, TargetLocalPath+child.path);
+							DbxDownloadFile(child.path, TargetLocalPath);
 						} catch (IOException e) {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
