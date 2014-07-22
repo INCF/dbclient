@@ -20,7 +20,10 @@ package DbxUtils;
 
 import com.dropbox.core.*;
 
+import java.awt.Desktop;
 import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Iterator;
 import java.util.Locale;
 
@@ -30,6 +33,7 @@ public class DbxUtility {
 	 	 */
 		final private String APP_KEY = "5jysg1bzg0ulli3";
 		final private String APP_SECRET = "t0ln07k26pctonw";
+		
 		
 		/*
 		 * Class variables used during the complete process of the plugin.
@@ -41,7 +45,33 @@ public class DbxUtility {
 		private String authorizeUrl;
 		private DbxAuthFinish authFinish;
 		private String accessToken;
+		public String OS = System.getProperty("os.name").toLowerCase();
 		
+		   
+		/*
+		 * Function to open Dropbox App URL in the default browser for user authentication 
+		*/
+		public void openDefaultBrowser(String url) {
+			if(Desktop.isDesktopSupported()){
+	            Desktop desktop = Desktop.getDesktop();
+	            try {
+	                desktop.browse(new URI(url));
+	            } catch (IOException | URISyntaxException e) {
+	                // TODO Auto-generated catch block
+	                e.printStackTrace();
+	            }
+	        }else{
+	            Runtime runtime = Runtime.getRuntime();
+	            try {
+	                runtime.exec("xdg-open " + url);
+	            } catch (IOException e) {
+	                // TODO Auto-generated catch block
+	                e.printStackTrace();
+	            }
+	        }
+		}
+		
+				
 		/*
 		 * Function for User Sign-in and Allow the Dropbox App MyCloudJ 
 		 */
@@ -56,6 +86,7 @@ public class DbxUtility {
 	        return authorizeUrl;
 		}
 
+		
 		/*
 		 * Function to accept the Access code and link the account of the user concerned.
 		 */
@@ -68,6 +99,7 @@ public class DbxUtility {
 	        client = new DbxClient(config, accessToken);
 		}
 
+		
 		/* 
 		 * Function to upload a "File" to Dropbox given the complete path of the file in local machine and the Dropbox folder's path
 		 * where "File" has to be saved.
@@ -85,25 +117,32 @@ public class DbxUtility {
 		        }
 		}
 		
+		
 		/* 
 		 * Function to upload a "Folder" to Dropbox given the complete path of the file in local machine and the Dropbox folder's path
 		 * where "Folder" has to be saved.
 		 */
 		public void DbxUploadFolder(String FolderLocalPath, String TargetDbxPath) throws IOException, DbxException {
-	        String folderName = FolderLocalPath.substring(FolderLocalPath.lastIndexOf("/")) ;
+			String newFolderLocalPath = FolderLocalPath.replace('\\', '/');
+			String folderName;
+        	folderName = newFolderLocalPath.substring(newFolderLocalPath.lastIndexOf("/"));
 			File inputFolder = new File(FolderLocalPath);
 	        if(inputFolder.isDirectory()) {
 	        	@SuppressWarnings("unused")
 				DbxEntry folder = client.createFolder(TargetDbxPath+folderName);
 	        	String[] files = inputFolder.list();
 	        	for(int i=0;i<files.length;i++) {
-	        		DbxUploadFolder(FolderLocalPath+"/"+files[i], TargetDbxPath+folderName);
+	        		if(OS.contains("windows"))
+	        			DbxUploadFolder(FolderLocalPath+'\\'+files[i], TargetDbxPath+folderName);
+	        		else
+	        			DbxUploadFolder(FolderLocalPath+'/'+files[i], TargetDbxPath+folderName);
 	        	}
 	        }
 	        else if(inputFolder.isFile()) {
 	        	DbxUploadFile(FolderLocalPath, TargetDbxPath+folderName);
 	        }
 		}
+		
 		
 		/* 
 		 * Function to download a "File" from Dropbox given the complete path of the file in Dropbox and also local machine path 
@@ -122,6 +161,7 @@ public class DbxUtility {
 	        }
 		}
 		
+		
 		/* 
 		 * Function to download a "Folder" from Dropbox given the complete path of the Folder in Dropbox and also the local machine path
 		 * where the "Folder" has to be saved.
@@ -134,7 +174,6 @@ public class DbxUtility {
 			TargetLocalPath += folderName;
 			boolean newFolder = new File(TargetLocalPath).mkdirs();
 			if(!newFolder) {
-				//System.out.println("Could not create a new folder");
 			}
 			/*
 			 * Function to get the metadata of the folder you wish to download
