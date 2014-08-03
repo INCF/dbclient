@@ -3,7 +3,7 @@
 	<classpathentry kind="src" path="src"/>
 	<classpathentry exported="true" kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry combineaccessrules="false" exported="true" kind="src" path="/IJ"/>
-	<classpathentry exported="true" kind="lib" path="/Users/mathuratin/Documents/workspace/MyCloudJ_/libs/dropbox-core-sdk-1.7.6.jar"/>
-	<classpathentry exported="true" kind="lib" path="/Users/mathuratin/Documents/workspace/MyCloudJ_/libs/jackson-core-2.2.3.jar"/>
+	<classpathentry kind="lib" path="/Users/mathuratin/Documents/workspace/MyCloudJ_/libs/dropbox-core-sdk-1.7.6.jar"/>
+	<classpathentry kind="lib" path="/Users/mathuratin/Documents/workspace/MyCloudJ_/libs/jackson-core-2.2.3.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
