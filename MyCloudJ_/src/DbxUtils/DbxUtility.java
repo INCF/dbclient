@@ -19,24 +19,27 @@ package DbxUtils;
  */
 
 import com.dropbox.core.*;
+
 import java.awt.Desktop;
 import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Iterator;
 import java.util.Locale;
-import javax.swing.tree.DefaultMutableTreeNode;
 
-// Dropbox APIs calls for the plugin are made from this class
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeModel;
+
+// Dropbox APIs calls for the MyCloudJ_ plugin are made from this class
 public class DbxUtility {
 		/*
 		 * Class variables
 		 */
 	
 		/*
-	 	 * Got this APP Key and Secret from the Developer's APP console.
-	 	 * APP_KEY			:	MycloudJ APP Key
-	 	 * APP_SECRET		:	MycloudJ APP Secret 
+	 	 * Got this APP Key and Secret from the Developer's APP console after registering an app
+	 	 * APP_KEY			:	MycloudJ APP Key (5jysg1bzg0ulli3)
+	 	 * APP_SECRET		:	MycloudJ APP Secret (t0ln07k26pctonw) 
 	 	 * 
 	 	 * Note				:	These will remain fixed and depends on the APP.
 	 	 */
@@ -45,25 +48,23 @@ public class DbxUtility {
 		
 		
 		/*
-		 * Dropbox API class objects
+		 * Dropbox API objects:
 		 * 
-		 * client			:	obj of class DbxClient. Use this class to make remote calls to the Dropbox API. You'll need an access token first
+		 * client			:	obj of class DbxClient. Use this class to make remote calls to the Dropbox API. You'll need an access token first. Note the public access specifier
 		 * 	
 		 * webAuth			:	obj of class DbxWebAuthNoRedirect. This class does the OAuth web-based authorization flow for apps that can't provide 
-		 * 						a redirect URI (such as the command-line example apps that come with this SDK).
+		 * 						a redirect URI.
 		 * 
 		 * config			:	obj of class DbxRequestConfig. This class manages the grouping of a few configuration parameters for how we should make 
 		 * 						requests to the Dropbox servers.
 		 * 
-		 * appInfo			:	obj of class DbxAppInfo. This class Identifies the information of Dropbox Apps
+		 * appInfo			:	obj of class DbxAppInfo. This class Identifies the information of the Dropbox App (In our case, it is the MyCloudJ_ Dropbox App).
 		 * 
-		 * authFinish		:	obj of class DbxAuthFinish. When you successfully complete the authorization process, 
-		 * 						the Dropbox server returns this information to you.
+		 * authFinish		:	obj of class DbxAuthFinish. When you successfully complete the authorization process, the Dropbox server returns this information to you.
 		 * 
-		 * authorizeUrl		:	String that stores the MyCloudJ App url
+		 * authorizeUrl		:	String that stores the MyCloudJ App url.
 		 * 
-		 * accessToken		:	String that stores the access token that allows to access a particular user's account. 
-		 * 						It is temporary and has to be generated everytime  
+		 * accessToken		:	String that stores the access token that allows to access a particular user's account. It is temporary and has to be generated everytime.  
 		 */
 		public DbxClient client;
 		private DbxWebAuthNoRedirect webAuth;
@@ -73,7 +74,17 @@ public class DbxUtility {
 		private String authorizeUrl;
 		private String accessToken;
 		
-		// Stores the OS-type: Linux/Windows/Mac
+		/*
+		 * User's Dropbox information	: 	Displayed in the text area after the plugin is connected to user's dropbox account.
+		 * 
+		 * userName						:	Dropbox user name
+		 * country						:	Country
+		 * userQuota					:	Total size(in GBs) of user's dropbox account 
+		 * 
+		 */
+		public String userName="", country="", userQuota="";
+		
+		// Stores the OS-type: Linux/Windows/Mac. It is used to solve the problem of path separator(/ or \\). It makes plugin platform independent.
 		public String OS = System.getProperty("os.name").toLowerCase();
 		
 		
@@ -81,17 +92,20 @@ public class DbxUtility {
 		 * Function to open Dropbox App URL in the default browser for user authentication
 		 * 
 		 * Parameters:
+		 * 
 		 * String url	:	MyCloudJ App url to be opened in the default browser
 		 * 
 		 * This function is called from the MyCloudJ_ class
 		*/
-		public void openDefaultBrowser(String url) {
+		public String openDefaultBrowser(String url) {
 			if(Desktop.isDesktopSupported()){
 	            Desktop desktop = Desktop.getDesktop();
 	            try {
 	            	// opens the url in the browser
 	                desktop.browse(new URI(url));
 	            } catch (IOException | URISyntaxException e) {
+	            	e.printStackTrace();
+	            	return e.getMessage();
 	            }
 	        }
 			else{
@@ -99,8 +113,11 @@ public class DbxUtility {
 	            try {
 	                runtime.exec("xdg-open " + url);
 	            } catch (IOException e) {
+	            	e.printStackTrace();
+	            	return e.getMessage();
 	            }
 	        }
+			return "done";
 		}
 		
 		
@@ -139,6 +156,14 @@ public class DbxUtility {
 	        
 	        // Passed accessToken in to the DbxClient constructor.
 	        client = new DbxClient(config, accessToken);
+	        
+	        /*
+			 * Retrieve username, country and quota from dropbox account info API and
+			 * print it in the text area for the user
+			 */
+	        userName = client.getAccountInfo().displayName;
+			country = client.getAccountInfo().country;
+			userQuota += (double)client.getAccountInfo().quota.total/(1024*1024*1024);
 		}
 		
 		
@@ -250,40 +275,16 @@ public class DbxUtility {
 	    
 	    /*
 	     * Function to add nodes to the JTree
+	     * 
+	     * This function is called when user selects a parent node and clicks Expand button
+	     * 
+	     * Parameters:
+	     * 
+	     * node		:	Parent node to which we have to add the child nodes.
+	     * name		:	name of the parent node 
+	     *
 	     */
-	    public void addChildren(DefaultMutableTreeNode node, String name) {
-	    	/*
-			 * Function to get the metadata of the folder you wish to download
-			 */
-			DbxEntry.WithChildren folderInfo=null;
-			try {
-				folderInfo = client.getMetadataWithChildren(name);
-			} catch (DbxException e) {
-			}
-			
-			/*
-			 * Iterate over children and add nodes into the JTree
-			 */
-			Iterator<DbxEntry> iterChildren;
-			 if (folderInfo == null) {
-			 } 
-			 else {				 
-				 iterChildren = folderInfo.children.iterator();
-				 @SuppressWarnings("unused")
-				 boolean tillEndOfDirectory = true;
-				 DbxEntry child;
-				 while(tillEndOfDirectory=iterChildren.hasNext()) {
-					child = iterChildren.next();
-					DefaultMutableTreeNode nodeChild = new DefaultMutableTreeNode(child.path);
-					node.add(nodeChild);
-				 }
-			 }
-	    }
-	    
-	    /*
-	     * Function to add nodes to the JTree
-	     */
-	    public void addChildrenFolder(DefaultMutableTreeNode node, String name) {
+	    public void addChildren(DefaultMutableTreeNode node, DefaultTreeModel Treemodel, String name) {
 	    	/*
 			 * Function to get the metadata of the folder you wish to download
 			 */
@@ -307,11 +308,81 @@ public class DbxUtility {
 				 DbxEntry child;
 				 while(tillEndOfDirectory=iterChildren.hasNext()) {
 					child = iterChildren.next();
+					DefaultMutableTreeNode nodeChild = new DefaultMutableTreeNode(child.path);
+					addUniqueNode(node, nodeChild, Treemodel);
+				 }
+			 }
+	    }
+	    
+	    /*
+	     * Function to add nodes to the JTree
+	     * 
+	     * This function is called when user selects a parent node and clicks Expand button
+	     * 
+	     * Parameters:
+	     * 
+	     * node		:	Parent node to which we have to add the child nodes.
+	     * name		:	name of the parent node
+	     * 
+	     * Note		:	The difference between this function is that it is used to add only those nodes which are "folder" type.	
+	     * 
+	     */
+	    public void addChildrenFolder(DefaultMutableTreeNode node, DefaultTreeModel Treemodel, String name) {
+	    	/*
+			 * Function to get the metadata of the folder you wish to download
+			 */
+	    	System.out.println(name);
+			DbxEntry.WithChildren folderInfo=null;
+			try {
+				folderInfo = client.getMetadataWithChildren(name);
+			} catch (DbxException e) {
+				e.printStackTrace();
+			}
+			
+			/*
+			 * Iterate over children and add nodes into the JTree
+			 */
+			Iterator<DbxEntry> iterChildren;
+			 if (folderInfo == null) {
+			 } 
+			 else {				 
+				 iterChildren = folderInfo.children.iterator();
+				 @SuppressWarnings("unused")
+				 boolean tillEndOfDirectory = true;
+				 DbxEntry child;
+				 while(tillEndOfDirectory=iterChildren.hasNext()) {
+					child = iterChildren.next();
 					if(child.isFolder()) {
 						DefaultMutableTreeNode nodeChild = new DefaultMutableTreeNode(child.path);
-						node.add(nodeChild);
+						addUniqueNode(node, nodeChild, Treemodel);
 					}	
 				 }
 			 }
+	    }
+	    
+	    /*
+	     * This function only adds unique children nodes to the parent node.
+	     * 
+	     * parentNode		:		Node to which children has to be added
+	     * childNode		:		Node to be added to the parent Node
+	     * model			:		JTree model
+	     * 
+	     */
+	    private void addUniqueNode(DefaultMutableTreeNode parentNode, DefaultMutableTreeNode childNode, DefaultTreeModel model) {
+	        // Check each node
+	        boolean isUnique = true;
+	        for (int i = 0; i < model.getChildCount(parentNode); i++)
+	        {
+	            Object compUserObj = ((DefaultMutableTreeNode) model.getChild(parentNode, i)).getUserObject();
+	            if (compUserObj.equals(childNode.getUserObject()))
+	            {
+	                isUnique = false;
+	                break;
+	            }
+	        }
+
+	        // If Unique, insert
+	        if(isUnique)
+	            model.insertNodeInto(childNode, parentNode, parentNode.getChildCount());
 	    }
 }

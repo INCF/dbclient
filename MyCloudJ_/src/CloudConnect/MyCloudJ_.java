@@ -22,7 +22,6 @@ package CloudConnect;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
-import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
@@ -54,7 +53,9 @@ import javax.swing.tree.TreeSelectionModel;
 
 import com.dropbox.core.*;
 
+import ij.ImagePlus;
 import ij.plugin.*;
+import ij.io.Opener;
 import DbxUtils.*;
 
 public class MyCloudJ_ implements PlugIn {
@@ -77,6 +78,8 @@ public class MyCloudJ_ implements PlugIn {
 	/*
 	 * JTree DbxTree1	:	Stores the complete metadata(path of folders) of Dropbox account. Used to display when user browses to 
 	 * 						select the files/folders to Download from.
+	 * 
+	 * Note				:	Each node in DbxTree1 represents a file/folder
 	 */
 	private JTree DbxTree1;
 	private DefaultTreeModel treeModel1;
@@ -86,10 +89,17 @@ public class MyCloudJ_ implements PlugIn {
 	/*
 	 * JTree DbxTree2	:	Stores the complete metadata(path of folders) of Dropbox account. Used to display when user browses to 
 	 * 						select the folders to Upload into.
+	 * 
+	 * Note				:	Each node in DbxTree2 represents a folder
 	 */
 	private JTree DbxTree2;
 	private DefaultTreeModel treeModel2;
 	private DefaultMutableTreeNode root2;
+	
+	/*
+	 * This holds the JTree node that is selected by the user for upload/download
+	 */
+	public Object node;
 	
 	
 	/*
@@ -190,6 +200,8 @@ public class MyCloudJ_ implements PlugIn {
         topPanel2.setBorder(title2);
         // will be used for displaying task related information to user (will be added to topPanel2)
         final JTextArea msgs = new JTextArea();
+        msgs.setLineWrap(true);
+        msgs.setWrapStyleWord(true);
         
         // First we'll add components to topPanel1. Then, we'll start with topPanel2 
         
@@ -321,9 +333,9 @@ public class MyCloudJ_ implements PlugIn {
 						 * Retrieve username, country and quota from dropbox account info API and
 						 * print it in the text area for the user
 						 */
-						userName = obj.client.getAccountInfo().displayName;
-						country = obj.client.getAccountInfo().country;
-						userQuota += (double)obj.client.getAccountInfo().quota.total/(1024*1024*1024);
+						userName = obj.userName;
+						country = obj.country;
+						userQuota = obj.userQuota;
 						lblStatus.setText("Connected as "+userName); 
 						userInfo.setText("Username: "+userName+"\nCountry: "+country+"\nQuota: "+userQuota+" GB");
 						
@@ -331,9 +343,10 @@ public class MyCloudJ_ implements PlugIn {
 						 * Create the JTree for browsing(to select path for downloading the file/folder)
 						 */
 						root1 = new DefaultMutableTreeNode("/");
-						obj.addChildren(root1,"/");
+						// obj.addChildren(root1, treeModel1, "/");
 		        		DbxTree1 = new JTree(root1);
 		        		treeModel1 = new DefaultTreeModel(root1);
+		        		obj.addChildren(root1, treeModel1, "/");
 		        		DbxTree1.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
 		        		treeModel1.reload(root1);
 						
@@ -341,9 +354,10 @@ public class MyCloudJ_ implements PlugIn {
 		        		 * Create the JTree for browsing(to select path for uploading the file/folder)
 		        		 */
 		        		root2 = new DefaultMutableTreeNode("/");
-						obj.addChildrenFolder(root2,"/");
+						// obj.addChildrenFolder(root2, treeModel2, "/");
 		        		DbxTree2 = new JTree(root2);
 		        		treeModel2 = new DefaultTreeModel(root2);
+		        		obj.addChildrenFolder(root2, treeModel2, "/");
 		        		DbxTree2.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
 		        		treeModel2.reload(root2);
 		        		
@@ -391,11 +405,14 @@ public class MyCloudJ_ implements PlugIn {
 						e4.printStackTrace();
 					}
 					
-					// To open the url in the default browser
-					obj.openDefaultBrowser(authorizeUrl);
+					// To open the url in the default browser. If return value is "done", it is successful. Otherwise, some error
+					String value = obj.openDefaultBrowser(authorizeUrl);
 					
-					// access code textfield enabled so that user can paste the access code in it and connect
-					accessCode.enable(true);
+					if(value.equals("done"))
+						accessCode.enable(true);  // access code textfield enabled so that user can paste the access code in it and connect
+					else
+						JOptionPane.showMessageDialog(mainFrame, "Error: "+value, "MyCLoudJ - Browser Error", JOptionPane.ERROR_MESSAGE);
+					
 				}
 				// If userStatus=1 (is already connected), no need to use connect connect button, warning for user
 				else {
@@ -548,7 +565,7 @@ public class MyCloudJ_ implements PlugIn {
 						    String parentName = parentNode.toString();
 						    
 						    // Add child nodes to this node(files and subfolders)
-						    obj.addChildren(parentNode, parentName);
+						    obj.addChildren(parentNode, treeModel1, parentName);
 						}
 					});
 			        
@@ -565,7 +582,7 @@ public class MyCloudJ_ implements PlugIn {
 			        	@Override
 			        	public void actionPerformed(ActionEvent e) {
 			        		// Get the latest node selected
-							Object node = DbxTree1.getLastSelectedPathComponent();
+							node = DbxTree1.getLastSelectedPathComponent();
 							
 							// Extract the name from the node and set the source address with its path
 						    String name;  
@@ -578,7 +595,7 @@ public class MyCloudJ_ implements PlugIn {
 								// Get the metadata of the name(node selected)
 								metaData = obj.client.getMetadata(name);
 							} catch (DbxException e1) {
-								msgs.append("\n"+e1.getMessage()+"\n");
+								msgs.append("Error: "+e1.getMessage()+"\n\n");
 								e1.printStackTrace();
 							}
 							
@@ -699,7 +716,7 @@ public class MyCloudJ_ implements PlugIn {
 						    String parentName = parentNode.toString();
 						    
 						    // Add child nodes to this node(only subfolders)
-						    obj.addChildrenFolder(parentNode, parentName);
+						    obj.addChildrenFolder(parentNode, treeModel2, parentName);
 						}
 					});
 			        
@@ -714,7 +731,7 @@ public class MyCloudJ_ implements PlugIn {
 			        panel2.add(Select);
 			        Select.addActionListener(new ActionListener() {
 						public void actionPerformed(ActionEvent e) {
-							Object node = DbxTree2.getLastSelectedPathComponent();  
+							node = DbxTree2.getLastSelectedPathComponent();  
 						    String name;  
 						    name = (node == null) ? "NONE" : node.toString();
 						    targetTxt.setText(name);
@@ -776,10 +793,10 @@ public class MyCloudJ_ implements PlugIn {
         rButton1.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				// intialize source address
+				// Reset source address to ""
 				srcTxt.setText("");
 				
-				// initialize target address
+				// Reset target address to ""
 				targetTxt.setText("");
 			}
 		});
@@ -787,10 +804,10 @@ public class MyCloudJ_ implements PlugIn {
         rButton2.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				// intialize source address
+				// Reset source address to ""
 				srcTxt.setText("");
 				
-				// initialize target address
+				// Reset target address to ""
 				targetTxt.setText("");
 			}
 		});
@@ -806,133 +823,119 @@ public class MyCloudJ_ implements PlugIn {
         btnStart.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				String source=srcTxt.getText();
+				final String target=targetTxt.getText();
 				// If source or target is empty, take no action and inform the user about the same
-				if(srcTxt.getText().equals("") || targetTxt.getText().equals("")) {
-					msgs.append("\nSelect the files/folder to upload/download");
+				if(source.equals("") || target.equals("")) {
+					msgs.append("Error: Select the files/folder to upload/download\n\n");
 					return;
 				}
 				
 				// If user wants to upload, this will be executed othewise else block will execute
 				if(rButton1.isSelected()) {
 					// open the file selected by the user
-					File file = new File(srcTxt.getText());
+					File file = new File(source);
 					
 					// Print the uploading information for the user in the text area
-					SwingUtilities.invokeLater(new Runnable() {
-					    public void run() {
-					      // Your Code Here
-					    	msgs.append("\nUploading "+srcTxt.getText()+" to Dropbox"+"\n");
-					    }
-					});
+					msgs.append("Message: Uploading "+source+" to Dropbox"+"\n\n");
 					
 					// Checks if selected path is of a file/folder, if file, then execute IF block
 					if(file.isFile()) {
-						try {
-							// Store the file path 
-							FileLocalPath = srcTxt.getText();
-							
-							// if windows OS, then change the separator from \\ to /
-							String newFileLocalPath = FileLocalPath.replace('\\', '/');
-							
-							// Retrieve the filename from the path
-							String fileName = newFileLocalPath.substring(newFileLocalPath.lastIndexOf("/"));
-							
-							// Target path in Dropbox folder
-							TargetDbxPath = targetTxt.getText();
-							
-							// Append the filename at the end of the target path
-							TargetDbxPath += fileName;
-							
-							// Call the upload function of DbxUtility class which in turn calls Dropbox API for upload function
-							obj.DbxUploadFile(FileLocalPath, TargetDbxPath);
-														
-							// Message once the upload is complete
-							msgs.append("Upload Complete !\n");
-							//JOptionPane.showMessageDialog(mainFrame, "Upload Complete !", "MyCLoudJ - Upload Complete", JOptionPane.INFORMATION_MESSAGE);
-							} catch (IOException | DbxException e1) {
-								msgs.append("\n"+e1.getMessage()+"\n");
-								//JOptionPane.showMessageDialog(mainFrame, "Upload Aborted !\n"+e1.getMessage(), "MyCLoudJ - Upload Aborted", JOptionPane.ERROR_MESSAGE);
-								e1.printStackTrace();
-							}
+						// Store the file path 
+						FileLocalPath = source;
+						
+						// if windows OS, then change the separator from \\ to /
+						String newFileLocalPath = FileLocalPath.replace('\\', '/');
+						
+						// Retrieve the filename from the path
+						String fileName = newFileLocalPath.substring(newFileLocalPath.lastIndexOf("/"));
+						
+						// Target path in Dropbox folder
+						TargetDbxPath = target;
+						
+						// Append the filename at the end of the target path
+						TargetDbxPath += fileName;
+						
+						// Call the upload function of DbxUtility class which in turn calls Dropbox API for upload function
+						SwingUtilities.invokeLater(new Runnable() {
+						    public void run() {
+						    	try {
+						    		obj.DbxUploadFile(FileLocalPath, TargetDbxPath);
+									msgs.append("Upload Complete !\n\n");	// Message once the upload is complete
+								} catch (IOException | DbxException e) {
+									e.printStackTrace();
+								}
+						    }
+						});
 					}
 					// If selected path is a directory, execute ELSE-IF block
 					else if (file.isDirectory()) {
-							try {
-								// Store the Local folder's path
-								FolderLocalPath = srcTxt.getText();
-								
-								// Store the Target Dropbox's path
-								TargetDbxPath = targetTxt.getText();
-								
-								// Call the upload function
-								obj.DbxUploadFolder(FolderLocalPath, TargetDbxPath);
-								
-								// Message, once the Upload is complete
-								msgs.append("Upload Complete !\n");
-								// JOptionPane.showMessageDialog(mainFrame, "Upload Complete !", "MyCLoudJ - Upload Complete", JOptionPane.INFORMATION_MESSAGE);
-							} catch (IOException | DbxException e1) {
-								msgs.append("\n"+e1.getMessage()+"\n");
-								//JOptionPane.showMessageDialog(mainFrame, "Upload Aborted !\n"+e1.getMessage(), "MyCLoudJ - Upload Aborted", JOptionPane.ERROR_MESSAGE);
-								e1.printStackTrace();
-							}
+							// Store the Local folder's path
+							FolderLocalPath = source;
+							
+							// Store the Target Dropbox's path
+							TargetDbxPath = target;
+							
+							// Call the upload function
+							SwingUtilities.invokeLater(new Runnable() {
+							    public void run() {
+							    	try {
+							    		obj.DbxUploadFolder(FolderLocalPath, TargetDbxPath);
+							    		obj.addChildrenFolder((DefaultMutableTreeNode)node, treeModel2, target);
+							    		msgs.append("Upload Complete !\n\n");	// Message, once the Upload is complete
+									} catch (IOException | DbxException e) {
+										e.printStackTrace();
+									}
+							    }
+							});
 					}
-
+					
 					// Code for Opening the file/folder after upload in default application
-					try {
-						Desktop.getDesktop().open(file);
-					} catch (IOException e1) {
-						msgs.append("\n"+e1.getMessage()+"\n");
-						e1.printStackTrace();
-					}
+					Opener openfile = new Opener();
+					openfile.open(source);
+					
 				}
 				// If user wants to upload, ELSE block will be executed
 				else if(rButton2.isSelected()) {
 					// Stores the target path on Local machine
-					TargetLocalPath = targetTxt.getText();
+					TargetLocalPath = target;
 
 					// Print the downloading information for the user in the text area
-					SwingUtilities.invokeLater(new Runnable() {
-					    public void run() {
-					      // Your Code Here
-					    	msgs.append("\nDownloading "+srcTxt.getText()+" from Dropbox"+"\n");
-					    }
-					});
+					msgs.append("Message: Downloading "+source+" from Dropbox"+"\n\n");
 					
 					// If the path is file, then execute this
 					if(File==1) {
-						try {
-							// Store the Dropbox file path
-							FileDbxPath = srcTxt.getText();
-							
-							// Call the download function of the DbxUtility class
-							obj.DbxDownloadFile(FileDbxPath, TargetLocalPath);
-							
-							// Message for Download complete
-							msgs.append("Download Complete !\n");
-							// JOptionPane.showMessageDialog(mainFrame, "Download Complete !", "MyCLoudJ - Download Complete", JOptionPane.INFORMATION_MESSAGE);
-							} catch (IOException | DbxException e1) {
-								msgs.append("\n"+e1.getMessage()+"\n");
-								//JOptionPane.showMessageDialog(mainFrame, "Download Aborted !\n"+e1.getMessage(), "MyCLoudJ - Download Aborted", JOptionPane.ERROR_MESSAGE);
-								e1.printStackTrace();
-							}
+						// Store the Dropbox file path
+						FileDbxPath = source;
+						
+						// Call the download function of the DbxUtility class
+						SwingUtilities.invokeLater(new Runnable() {
+						    public void run() {
+						    	try {
+									obj.DbxDownloadFile(FileDbxPath, TargetLocalPath);
+									msgs.append("Download Complete !\n\n");	// Message for Download complete
+								} catch (IOException | DbxException e) {
+									e.printStackTrace();
+								}
+						    }
+						});
 					}
 					// If the path is a directory. execute this
 					else if (File==0) {
-						try {
-							// Store the Dropbox folder path
-							FolderDbxPath = srcTxt.getText();
-							
-							// Call the download folder function of the DbXUtility class
-							obj.DbxDownloadFolder(FolderDbxPath, TargetLocalPath);
-							
-							// Message for Download Complete
-							msgs.append("Download Complete !\n");
-							// JOptionPane.showMessageDialog(mainFrame, "Download Complete !", "MyCLoudJ - Download Complete", JOptionPane.INFORMATION_MESSAGE);
-						} catch (DbxException e1) {
-							msgs.append("\n"+e1.getMessage()+"\n");
-							//JOptionPane.showMessageDialog(mainFrame, "Download Aborted !\n"+e1.getMessage(), "MyCLoudJ - Download Aborted", JOptionPane.ERROR_MESSAGE);
-							e1.printStackTrace();
-						} 
+						// Store the Dropbox folder path
+						FolderDbxPath = source;
+						
+						// Call the download folder function of the DbXUtility class
+						SwingUtilities.invokeLater(new Runnable() {
+						    public void run() {
+						    	try {
+						    		obj.DbxDownloadFolder(FolderDbxPath, TargetLocalPath);
+						    		msgs.append("Download Complete !\n\n");	// Message for Download Complete
+								} catch (DbxException e) {
+									e.printStackTrace();
+								}
+						    }
+						});
 					}
 
 					/*
@@ -944,8 +947,7 @@ public class MyCloudJ_ implements PlugIn {
 					 *  							getName("/Photos") returns "Photos"
 					 *  							getName("/Photos/Home.jpeg") returns "Home.jpeg"	
 					 */
-					String openFile = srcTxt.getText();
-					String lastPart = DbxPath.getName(openFile);
+					String lastPart = DbxPath.getName(source);
 					
 					// If OS is windows, the path separator is '\' else '/'
 					if(obj.OS.contains("windows")) {
@@ -956,15 +958,11 @@ public class MyCloudJ_ implements PlugIn {
 					}
 					
 					// Append the filename to Target local path
-					openFile = TargetLocalPath+lastPart;
-					File openFiles = new File(openFile);
-					try {
-						// open the file in the default application
-						Desktop.getDesktop().open(openFiles);
-					} catch (IOException e1) {
-						msgs.append("\n"+e1.getMessage()+"\n");
-						e1.printStackTrace();
-					}
+					source = TargetLocalPath+lastPart;
+					
+					// Code for Opening the file/folder after upload in default application
+					Opener openfile = new Opener();
+					openfile.open(source);
 				}
 			}
 		});
@@ -978,15 +976,12 @@ public class MyCloudJ_ implements PlugIn {
         JLabel lblMsg = new JLabel("Messages: ");
         rPanel5.add(lblMsg);
         
+        
         /*
          * JTextArea	:	For user's information (task related)
-         * 
-         * Added onto rPanel5
+         *					Added onto rPanel5
+         *					Added the scrollpane to text area
          */
-        msgs.setLineWrap(true);
-        msgs.setWrapStyleWord(true);
-        
-        // Added the scrollpane to text area
         JScrollPane msgsScrollPane = new JScrollPane(msgs);
         msgsScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
         msgsScrollPane.setPreferredSize(new Dimension(340, 220));
