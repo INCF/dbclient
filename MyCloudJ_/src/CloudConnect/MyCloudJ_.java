@@ -43,7 +43,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.JTree;
-import javax.swing.SwingUtilities;
 import javax.swing.border.Border;
 import javax.swing.border.TitledBorder;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -53,7 +52,6 @@ import javax.swing.tree.TreeSelectionModel;
 
 import com.dropbox.core.*;
 
-import ij.ImagePlus;
 import ij.plugin.*;
 import ij.io.Opener;
 import DbxUtils.*;
@@ -632,7 +630,7 @@ public class MyCloudJ_ implements PlugIn {
 			        // This will position the JFrame in the center of the screen
 			        treeFrame.setLocationRelativeTo(null);
 			        treeFrame.setTitle("Dropbox - Browse!");
-			        treeFrame.setSize(350,350);
+			        treeFrame.setSize(200,200);
 					
 			        // Add DbxTree1(JTree) to this panel and in turn in treeFrame
 			        treePanel.add(DbxTree1);
@@ -759,7 +757,7 @@ public class MyCloudJ_ implements PlugIn {
 			        // This will position the JFrame in the center of the screen
 			        treeFrame.setLocationRelativeTo(null);
 			        treeFrame.setTitle("Dropbox - Browse!");
-			        treeFrame.setSize(350,350);
+			        treeFrame.setSize(200,200);
 					
 			        // Add DbxTree2(JTree) to this panel and in turn in treeFrame
 			        treePanel.add(DbxTree2);
@@ -823,8 +821,10 @@ public class MyCloudJ_ implements PlugIn {
         btnStart.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				String source=srcTxt.getText();
+				/* Extract the source address and target address beforehand	*/
+				final String source=srcTxt.getText();
 				final String target=targetTxt.getText();
+				
 				// If source or target is empty, take no action and inform the user about the same
 				if(source.equals("") || target.equals("")) {
 					msgs.append("Error: Select the files/folder to upload/download\n\n");
@@ -841,6 +841,7 @@ public class MyCloudJ_ implements PlugIn {
 					
 					// Checks if selected path is of a file/folder, if file, then execute IF block
 					if(file.isFile()) {
+						
 						// Store the file path 
 						FileLocalPath = source;
 						
@@ -857,16 +858,21 @@ public class MyCloudJ_ implements PlugIn {
 						TargetDbxPath += fileName;
 						
 						// Call the upload function of DbxUtility class which in turn calls Dropbox API for upload function
-						SwingUtilities.invokeLater(new Runnable() {
-						    public void run() {
+						Thread thread = new Thread("New Upload Thread") {
+						      public void run(){
 						    	try {
-						    		obj.DbxUploadFile(FileLocalPath, TargetDbxPath);
-									msgs.append("Upload Complete !\n\n");	// Message once the upload is complete
+									obj.DbxUploadFile(FileLocalPath, TargetDbxPath);
 								} catch (IOException | DbxException e) {
 									e.printStackTrace();
 								}
-						    }
-						});
+								msgs.append("Upload Complete !\n\n");	// Message once the upload is complete
+								
+								// Code for Opening the file/folder after upload in default application
+								Opener openfile = new Opener();
+								openfile.open(source);
+						      }
+						   };
+						thread.start();
 					}
 					// If selected path is a directory, execute ELSE-IF block
 					else if (file.isDirectory()) {
@@ -877,23 +883,23 @@ public class MyCloudJ_ implements PlugIn {
 							TargetDbxPath = target;
 							
 							// Call the upload function
-							SwingUtilities.invokeLater(new Runnable() {
-							    public void run() {
+							Thread thread = new Thread("New Upload Thread") {
+							      public void run(){
 							    	try {
 							    		obj.DbxUploadFolder(FolderLocalPath, TargetDbxPath);
 							    		obj.addChildrenFolder((DefaultMutableTreeNode)node, treeModel2, target);
-							    		msgs.append("Upload Complete !\n\n");	// Message, once the Upload is complete
-									} catch (IOException | DbxException e) {
+							    	} catch (IOException | DbxException e) {
 										e.printStackTrace();
 									}
-							    }
-							});
+									msgs.append("Upload Complete !\n\n");	// Message once the upload is complete
+									
+									// Code for Opening the file/folder after upload in default application
+									Opener openfile = new Opener();
+									openfile.open(source);
+							      }
+							   };
+							thread.start();
 					}
-					
-					// Code for Opening the file/folder after upload in default application
-					Opener openfile = new Opener();
-					openfile.open(source);
-					
 				}
 				// If user wants to upload, ELSE block will be executed
 				else if(rButton2.isSelected()) {
@@ -909,16 +915,42 @@ public class MyCloudJ_ implements PlugIn {
 						FileDbxPath = source;
 						
 						// Call the download function of the DbxUtility class
-						SwingUtilities.invokeLater(new Runnable() {
-						    public void run() {
+						Thread thread = new Thread("New Download Thread") {
+						      public void run(){
 						    	try {
-									obj.DbxDownloadFile(FileDbxPath, TargetLocalPath);
-									msgs.append("Download Complete !\n\n");	// Message for Download complete
-								} catch (IOException | DbxException e) {
+						    		obj.DbxDownloadFile(FileDbxPath, TargetLocalPath);
+						    	} catch (DbxException | IOException e) {
 									e.printStackTrace();
 								}
-						    }
-						});
+						    	msgs.append("Download Complete !\n\n");	// Message for Download Complete
+						    	/*
+								 *  To open the file/folder which is downloaded from Dropbox
+								 *  
+								 *  DbxPath.getName(path)	:	Returns just the last component of the path.
+								 *  							For Ex:
+								 *  							getName("/") returns "/"
+								 *  							getName("/Photos") returns "Photos"
+								 *  							getName("/Photos/Home.jpeg") returns "Home.jpeg"	
+								 */
+								String lastPart = DbxPath.getName(source);
+								
+								// If OS is windows, the path separator is '\' else '/'
+								if(obj.OS.contains("windows")) {
+									lastPart = "\\"+lastPart;
+								}
+								else {
+									lastPart = "/"+lastPart;
+								}
+								
+								// Append the filename to Target local path
+								String finalSource = TargetLocalPath+lastPart;
+							
+								// Code for Opening the file/folder after upload in default application
+								Opener openfile = new Opener();
+								openfile.open(finalSource);
+						      }
+						   };
+						thread.start();
 					}
 					// If the path is a directory. execute this
 					else if (File==0) {
@@ -926,43 +958,43 @@ public class MyCloudJ_ implements PlugIn {
 						FolderDbxPath = source;
 						
 						// Call the download folder function of the DbXUtility class
-						SwingUtilities.invokeLater(new Runnable() {
-						    public void run() {
+						Thread thread = new Thread("New Download Thread") {
+						      public void run(){
 						    	try {
-						    		obj.DbxDownloadFolder(FolderDbxPath, TargetLocalPath);
-						    		msgs.append("Download Complete !\n\n");	// Message for Download Complete
+									obj.DbxDownloadFolder(FolderDbxPath, TargetLocalPath);
 								} catch (DbxException e) {
 									e.printStackTrace();
 								}
-						    }
-						});
+						    	msgs.append("Download Complete !\n\n");	// Message for Download Complete
+						    	/*
+								 *  To open the file/folder which is downloaded from Dropbox
+								 *  
+								 *  DbxPath.getName(path)	:	Returns just the last component of the path.
+								 *  							For Ex:
+								 *  							getName("/") returns "/"
+								 *  							getName("/Photos") returns "Photos"
+								 *  							getName("/Photos/Home.jpeg") returns "Home.jpeg"	
+								 */
+								String lastPart = DbxPath.getName(source);
+								
+								// If OS is windows, the path separator is '\' else '/'
+								if(obj.OS.contains("windows")) {
+									lastPart = "\\"+lastPart;
+								}
+								else {
+									lastPart = "/"+lastPart;
+								}
+								
+								// Append the filename to Target local path
+								String finalSource = TargetLocalPath+lastPart;
+							
+								// Code for Opening the file/folder after upload in default application
+								Opener openfile = new Opener();
+								openfile.open(finalSource);
+						      }
+						   };
+						thread.start();
 					}
-
-					/*
-					 *  To open the file/folder which is downloaded from Dropbox
-					 *  
-					 *  DbxPath.getName(path)	:	Returns just the last component of the path.
-					 *  							For Ex:
-					 *  							getName("/") returns "/"
-					 *  							getName("/Photos") returns "Photos"
-					 *  							getName("/Photos/Home.jpeg") returns "Home.jpeg"	
-					 */
-					String lastPart = DbxPath.getName(source);
-					
-					// If OS is windows, the path separator is '\' else '/'
-					if(obj.OS.contains("windows")) {
-						lastPart = "\\"+lastPart;
-					}
-					else {
-						lastPart = "/"+lastPart;
-					}
-					
-					// Append the filename to Target local path
-					source = TargetLocalPath+lastPart;
-					
-					// Code for Opening the file/folder after upload in default application
-					Opener openfile = new Opener();
-					openfile.open(source);
 				}
 			}
 		});

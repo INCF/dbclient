@@ -331,7 +331,6 @@ public class DbxUtility {
 	    	/*
 			 * Function to get the metadata of the folder you wish to download
 			 */
-	    	System.out.println(name);
 			DbxEntry.WithChildren folderInfo=null;
 			try {
 				folderInfo = client.getMetadataWithChildren(name);
