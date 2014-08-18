@@ -2,10 +2,10 @@ package CloudConnect;
 
 /*
  * Description		:		Google Summer of Code 2014 Project 
+ * Project Title	:		Dropbox Client for ImageJ (Image Processing Software in Java)
  * Organization		:		International Neuroinformatics Coordinating Facility, Belgian Node
- * Author			:		Atin Mathur (mathuratin007@gmail.com), (atin.mathur@lnmiit.ac.in)
- * Mentor			: 		Dimiter Prodanov
- * Project Title	:		Dropbox Client for ImageJ (Image Processing Software in java)
+ * Author			:		Atin Mathur (mathuratin007@gmail.com)
+ * Mentor			: 		Dimiter Prodanov (dimiterpp@gmail.com)
  * FileName			:		MyCloudJ_.java (package CloudConnect)
  * 							ImageJ Plugin for Dropbox Client. Uses the DbxUtility.java of package DbxUtils to access 
  * 							the User's Dropbox Accounts and perform download and upload actions.
@@ -13,8 +13,7 @@ package CloudConnect;
  * Users			:		Image Processing Researchers (Neuroscientists etc.)
  * Motivation		:		To facilitate the sharing of datasets among ImageJ users
  * Technologies		:		Java, Dropbox Core APIs, Restful Web Services, Swing GUI
- * Installation		:		Put the plugin/MyCloudJ_.jar to the plugins/ folder of the ImageJ. It will show 
- * 							up in the plugins when you run ImageJ.
+ * Installation		:		Put the plugin/MyCloudJ_.jar to the plugins/ folder of the ImageJ. It will show up in the plugins when you run ImageJ.
  * Requirements		:		ImageJ alongwith JRE 1.7 or later.
  * Date				:		19-May-2014
  */
@@ -28,7 +27,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.IOException;
-
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
@@ -56,6 +54,7 @@ import ij.plugin.*;
 import ij.io.Opener;
 import DbxUtils.*;
 
+// MyCloudJ_ class contains the ImageJ plugin for Dropbox client for ImageJ
 public class MyCloudJ_ implements PlugIn {
 	/*
 	 *  Class variables
@@ -93,6 +92,7 @@ public class MyCloudJ_ implements PlugIn {
 	private JTree DbxTree2;
 	private DefaultTreeModel treeModel2;
 	private DefaultMutableTreeNode root2;
+	
 	
 	/*
 	 * This holds the JTree node that is selected by the user for upload/download
@@ -138,7 +138,7 @@ public class MyCloudJ_ implements PlugIn {
 	
 	
 	/*
-	 * File		:	Used to Determine whether a path is File or Folder 
+	 * File		:	Used to Determine whether a path is File or Folder. Used in calling download/upload functions for file or folder respectively. 
 	 */
 	private int File=0;
 	
@@ -148,7 +148,7 @@ public class MyCloudJ_ implements PlugIn {
 	 */
 	private String heading = "  Instructions : \n \n";
 	private String step1 = "  1. Click the \"Access Dropbox !\" button below. It will open the Dropbox app URL in the default browser.\n \n";
-	private String step2 = "  2. Next, Sign in to the Dropbox account and allow the MyCloudJ App.\n \n";
+	private String step2 = "  2. Next, Sign-in to the Dropbox account and allow the MyCloudJ App.\n \n";
 	private String step3 = "  3. On clicking the \"Allow\" button, Dropbox will generate an access code.\n \n";
 	private String step4 = "  4. Copy the \"access code\" and paste it in the text field below.\n \n";
 	private String step5 = "  5. Click the \"Connect !\" button. You can now access Dropbox.\n \n";
@@ -168,7 +168,7 @@ public class MyCloudJ_ implements PlugIn {
 		final JFrame mainFrame = new JFrame();
 		mainFrame.setLayout(new FlowLayout());
         mainFrame.setTitle("CloudConnect - MyCloudJ");
-        mainFrame.setSize(1200,500);
+        mainFrame.setSize(1200,450);
         mainFrame.setResizable(false);
         // This will position the JFrame in the center of the screen
         mainFrame.setLocationRelativeTo(null);
@@ -185,7 +185,7 @@ public class MyCloudJ_ implements PlugIn {
          */
         Border blackline = BorderFactory.createLineBorder(Color.black);
         TitledBorder title1 = BorderFactory.createTitledBorder(blackline, "Dropbox Connect");
-        TitledBorder title2 = BorderFactory.createTitledBorder(blackline, "Tasks");
+        TitledBorder title2 = BorderFactory.createTitledBorder(blackline, "Dropbox Tasks");
         
         // topPanel1
         final JPanel topPanel1 = new JPanel();
@@ -196,12 +196,15 @@ public class MyCloudJ_ implements PlugIn {
         final JPanel topPanel2 = new JPanel();
         topPanel2.setLayout(new BoxLayout(topPanel2, BoxLayout.PAGE_AXIS));
         topPanel2.setBorder(title2);
-        // will be used for displaying task related information to user (will be added to topPanel2)
+        
+        // msgs will be used for displaying task related information to user (will be added to topPanel2)
         final JTextArea msgs = new JTextArea();
         msgs.setLineWrap(true);
         msgs.setWrapStyleWord(true);
         
+        
         // First we'll add components to topPanel1. Then, we'll start with topPanel2 
+        
         
         /*
          * These panels will add into topPanel1 (Left side of the frame)
@@ -338,10 +341,17 @@ public class MyCloudJ_ implements PlugIn {
 						userInfo.setText("Username: "+userName+"\nCountry: "+country+"\nQuota: "+userQuota+" GB");
 						
 						/*
+						 * Added 2 different JTree (DbxTree1 and DbxTree2) for download and upload respectively.
+						 * Because DbxTree1 contains both files/folders as nodes. However, DbxTree2 contains only folders as nodes. For convenience, added 2 different JTree for Dropbox metadata.
+						 * For robustness, we are checking inside the code whether the selected node is a file or folder rather can leaving it to user.
+						 */
+						
+						/*
 						 * Create the JTree for browsing(to select path for downloading the file/folder)
+						 * Only added top subfolder/files of the Dropbox root folder i.e. "/"
+						 * Will add new nodes on demand of the user in form of "Expand" clicks
 						 */
 						root1 = new DefaultMutableTreeNode("/");
-						// obj.addChildren(root1, treeModel1, "/");
 		        		DbxTree1 = new JTree(root1);
 		        		treeModel1 = new DefaultTreeModel(root1);
 		        		obj.addChildren(root1, treeModel1, "/");
@@ -350,9 +360,10 @@ public class MyCloudJ_ implements PlugIn {
 						
 		        		/*
 		        		 * Create the JTree for browsing(to select path for uploading the file/folder)
+		        		 * Only added subfolders of the Dropbox root folder i.e. "/"
+		        		 * Will add new nodes on demand of the user in form of "Expand" clicks
 		        		 */
 		        		root2 = new DefaultMutableTreeNode("/");
-						// obj.addChildrenFolder(root2, treeModel2, "/");
 		        		DbxTree2 = new JTree(root2);
 		        		treeModel2 = new DefaultTreeModel(root2);
 		        		obj.addChildrenFolder(root2, treeModel2, "/");
@@ -364,14 +375,13 @@ public class MyCloudJ_ implements PlugIn {
 		        		 * after the user is connected.
 		        		 */
 		        		accessCode.disable();
-		        		
 		        		// All the components of topPanel2 are enabled after successful connection with user's dropbox account
 		        		setEnabledAll(topPanel2, true);
 					}
 					// If user is already connected userStatus=1, warning for user
 					else if(userStatus == 1)
 						JOptionPane.showMessageDialog(mainFrame, "Already connected !", "MyCLoudJ - Already Connected", JOptionPane.WARNING_MESSAGE);
-					// If user is not connected but there is no access code
+					// If user is not connected but there is no access code, information for user
 					else if(userStatus == 0 && code.equals(""))
 						JOptionPane.showMessageDialog(mainFrame, "Enter Access Code !", "MyCLoudJ - Enter Access code", JOptionPane.WARNING_MESSAGE);
 				} catch (IOException e1) {
@@ -392,7 +402,7 @@ public class MyCloudJ_ implements PlugIn {
         accessDbxButton.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				// if user if not connected, then
+				// if user if not connected, then execute if block
 				if(userStatus == 0){
 					// Generate the authorize URL
 					try {
@@ -405,12 +415,10 @@ public class MyCloudJ_ implements PlugIn {
 					
 					// To open the url in the default browser. If return value is "done", it is successful. Otherwise, some error
 					String value = obj.openDefaultBrowser(authorizeUrl);
-					
 					if(value.equals("done"))
 						accessCode.enable(true);  // access code textfield enabled so that user can paste the access code in it and connect
 					else
 						JOptionPane.showMessageDialog(mainFrame, "Error: "+value, "MyCLoudJ - Browser Error", JOptionPane.ERROR_MESSAGE);
-					
 				}
 				// If userStatus=1 (is already connected), no need to use connect connect button, warning for user
 				else {
@@ -505,7 +513,7 @@ public class MyCloudJ_ implements PlugIn {
         btnFileChooser1.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
-				// If user wants to Upload(Upload Radio button is selected), then source is the local machine
+				// If user wants to Upload(Upload Radio button is selected), then source is the local machine, browse from Local Machine
 				if(rButton1.isSelected()) {
 					// JFileChooser opens in current directory(imagej plugins/)
 					JFileChooser chooser= new JFileChooser(new File("."));
@@ -520,7 +528,7 @@ public class MyCloudJ_ implements PlugIn {
 					// The path of the selected file is set in the source textfield
 					srcTxt.setText(chosenFile.getAbsolutePath());
 				}
-				// If user wants to Download(Download Radio button is selected), then source is the Dropbox
+				// If user wants to Download(Download Radio button is selected), then source is the Dropbox, browse from Dropbox
 				else if(rButton2.isSelected()) {
 					/*
 	        		 * This JFrame contains Dropbox Jtree for selecting the files/folder
@@ -529,6 +537,7 @@ public class MyCloudJ_ implements PlugIn {
 					BoxLayout boxLayout = new BoxLayout(treeFrame.getContentPane(), BoxLayout.Y_AXIS);
 					treeFrame.setLayout(boxLayout);
 					
+					
 					/*
 					 * JPanel for browsing frame
 					 * 
@@ -536,6 +545,7 @@ public class MyCloudJ_ implements PlugIn {
 					 */
 					JPanel treePanel = new JPanel();
 					JScrollPane scroll = new JScrollPane(treePanel);
+					
 					
 					/*
 					 * JButton
@@ -556,7 +566,7 @@ public class MyCloudJ_ implements PlugIn {
 							// Parent path of the currently selected node
 						    TreePath parentPath = DbxTree1.getSelectionPath();
 						    
-						    // get t a the parent node(one in which we have to add children)
+						    // get the parent node(one in which we have to add children)
 						    parentNode = (DefaultMutableTreeNode)(parentPath.getLastPathComponent());
 						    
 						    // extract the name of the node
@@ -567,10 +577,11 @@ public class MyCloudJ_ implements PlugIn {
 						}
 					});
 			        
+			        
 			        /*
 					 * JButton
 					 * 
-					 * Select	:	Select the folder/file and set the source textfield with its dropbox path
+					 * Select	:	Select the folder/file and set the source textfield with the dropbox path of selected file/folder
 					 *
 					 * Added onto panel2
 					 */
@@ -597,10 +608,10 @@ public class MyCloudJ_ implements PlugIn {
 								e1.printStackTrace();
 							}
 							
-							// If this file, then set File=1(used while calling download function for file)
+							// If selected node of JTree is a File, then set File=1(used while calling download function for file)
 						    if(metaData.isFile())
 								File=1;
-						    // If this file, then set File=0(used while calling download function for folder)
+						    // If selected node of JTree is a Folder, then set File=0(used while calling download function for folder)
 							else if(metaData.isFolder())
 								File=0;
 						    
@@ -609,6 +620,7 @@ public class MyCloudJ_ implements PlugIn {
 						}
 					});
 
+			        
 			        /*
 			         * JButton
 			         * 
@@ -626,11 +638,11 @@ public class MyCloudJ_ implements PlugIn {
 						}
 					});
 
-			        
+
 			        // This will position the JFrame in the center of the screen
 			        treeFrame.setLocationRelativeTo(null);
 			        treeFrame.setTitle("Dropbox - Browse!");
-			        treeFrame.setSize(200,200);
+			        treeFrame.setSize(350,150);
 					
 			        // Add DbxTree1(JTree) to this panel and in turn in treeFrame
 			        treePanel.add(DbxTree1);
@@ -671,7 +683,7 @@ public class MyCloudJ_ implements PlugIn {
         btnFileChooser2.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				// If user wants to Upload(Upload Radio button is selected), then target is the Dropbox
+				// If user wants to Upload(Upload Radio button is selected), then target is the Dropbox, browse the Dropbox
 				if(rButton1.isSelected()) {
 					/*
 	        		 * This JFrame contains Dropbox Jtree for selecting the folder for upload
@@ -680,6 +692,7 @@ public class MyCloudJ_ implements PlugIn {
 					BoxLayout boxLayout = new BoxLayout(treeFrame.getContentPane(), BoxLayout.Y_AXIS);
 					treeFrame.setLayout(boxLayout);
 					
+					
 					/*
 					 * JPanel for browsing frame
 					 * 
@@ -687,6 +700,7 @@ public class MyCloudJ_ implements PlugIn {
 					 */
 					JPanel treePanel = new JPanel();
 					JScrollPane scroll = new JScrollPane(treePanel);
+					
 					
 					/*
 					 * JButton
@@ -707,7 +721,7 @@ public class MyCloudJ_ implements PlugIn {
 			        		// Parent path of the currently selected node
 						    TreePath parentPath = DbxTree2.getSelectionPath();
 						    
-						    // get t a the parent node(one in which we have to add children)
+						    // get the parent node(one in which we have to add children)
 						    parentNode = (DefaultMutableTreeNode)(parentPath.getLastPathComponent());
 						    
 						    // extract the name of the node
@@ -717,6 +731,7 @@ public class MyCloudJ_ implements PlugIn {
 						    obj.addChildrenFolder(parentNode, treeModel2, parentName);
 						}
 					});
+			        
 			        
 			        /*
 					 * JButton
@@ -729,14 +744,18 @@ public class MyCloudJ_ implements PlugIn {
 			        panel2.add(Select);
 			        Select.addActionListener(new ActionListener() {
 						public void actionPerformed(ActionEvent e) {
+							// Get the latest node selected
 							node = DbxTree2.getLastSelectedPathComponent();  
-						    String name;  
+						    
+							// Extract the name from the node and set the source address with its path
+							String name;  
 						    name = (node == null) ? "NONE" : node.toString();
 						    targetTxt.setText(name);
 						    treeFrame.dispose();
 						}
 					});
 
+			        
 			        /*
 			         * JButton
 			         * 
@@ -757,7 +776,7 @@ public class MyCloudJ_ implements PlugIn {
 			        // This will position the JFrame in the center of the screen
 			        treeFrame.setLocationRelativeTo(null);
 			        treeFrame.setTitle("Dropbox - Browse!");
-			        treeFrame.setSize(200,200);
+			        treeFrame.setSize(350,150);
 					
 			        // Add DbxTree2(JTree) to this panel and in turn in treeFrame
 			        treePanel.add(DbxTree2);
@@ -765,12 +784,12 @@ public class MyCloudJ_ implements PlugIn {
 			        treeFrame.add(panel2);
 			        treeFrame.setVisible(true);
 				}
-				// If user wants to Download(Download Radio button is selected), then target is the local machine
+				// If user wants to Download(Download Radio button is selected), then target is the local machine, browse from local machine
 				else if(rButton2.isSelected()) {
 					// JFileChooser opens in current directory(imagej plugins/)	
 					JFileChooser chooser= new JFileChooser(new File("."));
 					
-					// Only Directories are allowed
+					// Only Directories are allowed, files can only be downloaded into Directories 
 					chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
 					int choice = chooser.showOpenDialog(chooser);
 					if (choice != JFileChooser.APPROVE_OPTION) return;
@@ -786,7 +805,7 @@ public class MyCloudJ_ implements PlugIn {
         
         
         /*
-         * Set source/target address to "".
+         * Set source/target address to "" whenever radio button is changed from rButton1(upload) to rButtoon2(download) and vice versa.
          */
         rButton1.addActionListener(new ActionListener() {
 			@Override
@@ -798,7 +817,6 @@ public class MyCloudJ_ implements PlugIn {
 				targetTxt.setText("");
 			}
 		});
-        
         rButton2.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
@@ -837,11 +855,10 @@ public class MyCloudJ_ implements PlugIn {
 					File file = new File(source);
 					
 					// Print the uploading information for the user in the text area
-					msgs.append("Message: Uploading "+source+" to Dropbox"+"\n\n");
+					msgs.append("Message: Uploading "+source+" to Dropbox path: "+target+"\n\n");
 					
-					// Checks if selected path is of a file/folder, if file, then execute IF block
+					// Checks if selected path is of a file or a folder, if file, then execute IF block
 					if(file.isFile()) {
-						
 						// Store the file path 
 						FileLocalPath = source;
 						
@@ -857,19 +874,23 @@ public class MyCloudJ_ implements PlugIn {
 						// Append the filename at the end of the target path
 						TargetDbxPath += fileName;
 						
-						// Call the upload function of DbxUtility class which in turn calls Dropbox API for upload function
+						/*
+						 *  Call the upload function of DbxUtility class which in turn calls Dropbox API for upload function
+						 *  New thread is spawn as this may take a long time and GUI becomes unresponsive if there is a single thread 
+						 */
 						Thread thread = new Thread("New Upload Thread") {
 						      public void run(){
+						    	String localSource = source;  
 						    	try {
 									obj.DbxUploadFile(FileLocalPath, TargetDbxPath);
 								} catch (IOException | DbxException e) {
 									e.printStackTrace();
 								}
-								msgs.append("Upload Complete !\n\n");	// Message once the upload is complete
+								msgs.append("Uploading of "+localSource+" Complete !\n\n");	// Message once the upload is complete
 								
 								// Code for Opening the file/folder after upload in default application
 								Opener openfile = new Opener();
-								openfile.open(source);
+								openfile.open(localSource);
 						      }
 						   };
 						thread.start();
@@ -882,47 +903,57 @@ public class MyCloudJ_ implements PlugIn {
 							// Store the Target Dropbox's path
 							TargetDbxPath = target;
 							
-							// Call the upload function
+							/*
+							 *  Call the upload function
+							 *  New thread is spawn as this may take a long time and GUI becomes unresponsive if there is a single thread
+							 */
 							Thread thread = new Thread("New Upload Thread") {
 							      public void run(){
+							    	String localSource = source;  
 							    	try {
 							    		obj.DbxUploadFolder(FolderLocalPath, TargetDbxPath);
 							    		obj.addChildrenFolder((DefaultMutableTreeNode)node, treeModel2, target);
 							    	} catch (IOException | DbxException e) {
 										e.printStackTrace();
 									}
-									msgs.append("Upload Complete !\n\n");	// Message once the upload is complete
+							    	msgs.append("Uploading of "+localSource+" Complete !\n\n");	// Message once the upload is complete
 									
 									// Code for Opening the file/folder after upload in default application
 									Opener openfile = new Opener();
-									openfile.open(source);
+									openfile.open(localSource);
 							      }
 							   };
 							thread.start();
 					}
 				}
-				// If user wants to upload, ELSE block will be executed
+				// If user wants to download, ELSE block will be executed
 				else if(rButton2.isSelected()) {
 					// Stores the target path on Local machine
 					TargetLocalPath = target;
 
 					// Print the downloading information for the user in the text area
-					msgs.append("Message: Downloading "+source+" from Dropbox"+"\n\n");
+					msgs.append("Message: Downloading "+source+" from Dropbox to Local Path: "+target+"\n\n");
 					
 					// If the path is file, then execute this
 					if(File==1) {
 						// Store the Dropbox file path
 						FileDbxPath = source;
 						
-						// Call the download function of the DbxUtility class
+						/*
+						 *  Call the download function of the DbxUtility class
+						 *  New thread is spawn as this may take a long time and GUI becomes unresponsive if there is a single thread
+						 */
 						Thread thread = new Thread("New Download Thread") {
 						      public void run(){
-						    	try {
+						    	  String localSource = source;
+								  String localTarget = target;
+						    	  try {
 						    		obj.DbxDownloadFile(FileDbxPath, TargetLocalPath);
 						    	} catch (DbxException | IOException e) {
 									e.printStackTrace();
 								}
-						    	msgs.append("Download Complete !\n\n");	// Message for Download Complete
+						    	msgs.append("Downloading of "+localSource+" Complete !\n\n");	// Message once the upload is complete
+						    	
 						    	/*
 								 *  To open the file/folder which is downloaded from Dropbox
 								 *  
@@ -932,7 +963,7 @@ public class MyCloudJ_ implements PlugIn {
 								 *  							getName("/Photos") returns "Photos"
 								 *  							getName("/Photos/Home.jpeg") returns "Home.jpeg"	
 								 */
-								String lastPart = DbxPath.getName(source);
+								String lastPart = DbxPath.getName(localSource);
 								
 								// If OS is windows, the path separator is '\' else '/'
 								if(obj.OS.contains("windows")) {
@@ -943,7 +974,7 @@ public class MyCloudJ_ implements PlugIn {
 								}
 								
 								// Append the filename to Target local path
-								String finalSource = TargetLocalPath+lastPart;
+								String finalSource = localTarget+lastPart;
 							
 								// Code for Opening the file/folder after upload in default application
 								Opener openfile = new Opener();
@@ -957,15 +988,21 @@ public class MyCloudJ_ implements PlugIn {
 						// Store the Dropbox folder path
 						FolderDbxPath = source;
 						
-						// Call the download folder function of the DbXUtility class
+						/*
+						 *  Call the download folder function of the DbXUtility class
+						 *  New thread is spawn as this may take a long time and GUI becomes unresponsive if there is a single thread
+						 */
 						Thread thread = new Thread("New Download Thread") {
 						      public void run(){
+						    	String localSource = source;
+								String localTarget = target;
 						    	try {
 									obj.DbxDownloadFolder(FolderDbxPath, TargetLocalPath);
-								} catch (DbxException e) {
+								} catch (IOException | DbxException e) {
 									e.printStackTrace();
 								}
-						    	msgs.append("Download Complete !\n\n");	// Message for Download Complete
+						    	msgs.append("Downloading of "+localSource+" Complete !\n\n");	// Message once the upload is complete
+						    	
 						    	/*
 								 *  To open the file/folder which is downloaded from Dropbox
 								 *  
@@ -975,7 +1012,7 @@ public class MyCloudJ_ implements PlugIn {
 								 *  							getName("/Photos") returns "Photos"
 								 *  							getName("/Photos/Home.jpeg") returns "Home.jpeg"	
 								 */
-								String lastPart = DbxPath.getName(source);
+								String lastPart = DbxPath.getName(localSource);
 								
 								// If OS is windows, the path separator is '\' else '/'
 								if(obj.OS.contains("windows")) {
@@ -986,7 +1023,7 @@ public class MyCloudJ_ implements PlugIn {
 								}
 								
 								// Append the filename to Target local path
-								String finalSource = TargetLocalPath+lastPart;
+								String finalSource = localTarget+lastPart;
 							
 								// Code for Opening the file/folder after upload in default application
 								Opener openfile = new Opener();

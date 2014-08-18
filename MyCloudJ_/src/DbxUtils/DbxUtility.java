@@ -2,18 +2,17 @@ package DbxUtils;
 
 /*
  * Description		:		Google Summer of Code 2014 Project
+ * Project Title	:		Dropbox Client for ImageJ (Image Processing Software in Java)
  * Organization		:		International Neuroinformatics Coordinating Facility (INCF), Belgian Node
  * Author			:		Atin Mathur (mathuratin007@gmail.com)
- * Mentor			: 		Dimiter Prodanov
- * Project Title	:		Dropbox Client for ImageJ (Image Processing Software in java)
+ * Mentor			: 		Dimiter Prodanov (dimiterpp@gmail.com)
  * FileName			:		DbxUtility.java (package DbxUtils)
- * 							Contains all the functions to access the User's Dropbox Accounts 
+ * 							Contains all the functions to access the User's Dropbox Accounts via Dropbox Core APIs
  * 
  * Users			:		Image Processing Researchers (Neuroscientists etc.)
  * Motivation		:		To facilitate the sharing of datasets on among ImageJ users
  * Technologies		:		Java, Dropbox Core APIs, Restful Web Services, Swing GUI
- * Installation		:		Put the plugin/MyCloudJ_.jar to the plugins/ folder of the ImageJ. It will show 
- * 							up in the plugins when you run ImageJ.
+ * Installation		:		Put the plugin/MyCloudJ_.jar to the plugins/ folder of the ImageJ. It will show up in the plugins when you run ImageJ.
  * Requirements		:		ImageJ alongwith JRE 1.7 or later. 
  * Date				:		19-May-2014
  */
@@ -172,6 +171,9 @@ public class DbxUtility {
 		 * where "File" has to be saved.
 		 * 
 		 * Parameters:
+		 * 
+		 * FileLocalPath		:		Absolute Local Path of the File to be uploaded to Dropbox
+		 * TargetDbxPath		:		Absolute Dropox Path of the folder where the file is to be added
 		 *  
 		 */
 		public void DbxUploadFile(String FileLocalPath, String TargetDbxPath) throws IOException, DbxException {
@@ -180,6 +182,7 @@ public class DbxUtility {
 	        try {
 		        if(!inputFile.isHidden()) {
 		        	@SuppressWarnings("unused")
+		        	// Upload the file to dropbox
 					DbxEntry.File uploadedFile = client.uploadFile(TargetDbxPath, DbxWriteMode.add(), inputFile.length(), inputStream);
 		        }
 		        } finally {
@@ -189,18 +192,46 @@ public class DbxUtility {
 		
 		
 		/* 
-		 * Function to upload a "Folder" to Dropbox given the complete path of the file in local machine and the Dropbox folder's path
+		 * Function to upload a "Folder" to Dropbox given the complete path of the folder in local machine and the Dropbox folder's path
 		 * where "Folder" has to be saved.
+		 * 
+		 * Parameters:
+		 * 
+		 * FolderLocalPath		:		Absolute Path of the Folder to be uploaded to Dropbox
+		 * TargetDbxPath		:		Absolute Dropox Path of the folder where the Folder has to be uploaded
+		 * 
 		 */
 		public void DbxUploadFolder(String FolderLocalPath, String TargetDbxPath) throws IOException, DbxException {
+			// Replace Path separator '\\' (for windows) to  Dropbox Path Separator '/'
 			String newFolderLocalPath = FolderLocalPath.replace('\\', '/');
+			
+			// Extract the foldername i.e. Last part of the Path 
 			String folderName;
         	folderName = newFolderLocalPath.substring(newFolderLocalPath.lastIndexOf("/"));
+        	
+        	// File pointer to the folder 
 			File inputFolder = new File(FolderLocalPath);
-	        if(inputFolder.isDirectory()) {
+	        
+			/*
+			 *  If Folder is a directory, Execute this part
+			 *  We iteratively call DbxUploadFile for each children (sub-folders and files) inside the folder.
+			 */
+			if(inputFolder.isDirectory()) {
 	        	@SuppressWarnings("unused")
+	        	// Create a new folder of name "string folderName" inside Dropbox folder TargetDbxPath
 				DbxEntry folder = client.createFolder(TargetDbxPath+folderName);
+	        	
+	        	// List of files inside the folder 
 	        	String[] files = inputFolder.list();
+	        	
+	        	/*
+	        	 * Iterate for each child in the list and call,  
+	        	 * 
+	        	 * 1. DbxUploadFile() function if the child is a file, otherwise
+	        	 * 
+	        	 * 2. DbxUploadFolder() function if the child is a sub-folder.
+	        	 * 
+	        	 */
 	        	for(int i=0;i<files.length;i++) {
 	        		if(OS.contains("windows"))
 	        			DbxUploadFolder(FolderLocalPath+'\\'+files[i], TargetDbxPath+folderName);
@@ -208,6 +239,7 @@ public class DbxUtility {
 	        			DbxUploadFolder(FolderLocalPath+'/'+files[i], TargetDbxPath+folderName);
 	        	}
 	        }
+			// If the folder is not a directory but a file. This will never execute if the we check the File Type before calling this method. 
 	        else if(inputFolder.isFile()) {
 	        	DbxUploadFile(FolderLocalPath, TargetDbxPath+folderName);
 	        }
@@ -217,14 +249,26 @@ public class DbxUtility {
 		/* 
 		 * Function to download a "File" from Dropbox given the complete path of the file in Dropbox and also local machine path 
 		 * where the "File" has to be saved.
+		 * 
+		 * Parameters:
+		 * 
+		 * FileDbxPath			:		Complete Dropbox Path of the File to be downloaded from Dropbox
+		 * TargetLocalPath		:		Absolute Local Path of the folder where the file has to be downloaded
+		 * 
 		 */
 		public void DbxDownloadFile(String FileDbxPath, String TargetLocalPath) throws IOException, DbxException {
+			// Extract the filename from the absolute path i.e. the last part
 			String fileName = FileDbxPath.substring(FileDbxPath.lastIndexOf("/"));
+			
+			// Add the filename to the end of the local machine path where the file has to be added
 			TargetLocalPath += fileName;
+			
+			// File Pointer to the file
 			File SaveAsFile = new File(TargetLocalPath);
 	        OutputStream outputStream = new FileOutputStream(SaveAsFile);
 	        try {
 	        @SuppressWarnings("unused")
+	        // download the file from Dropbox
 			DbxEntry.File downloadedFile = client.getFile(FileDbxPath, null, outputStream);
 	        } finally {
 	            outputStream.close();
@@ -235,15 +279,23 @@ public class DbxUtility {
 		/* 
 		 * Function to download a "Folder" from Dropbox given the complete path of the Folder in Dropbox and also the local machine path
 		 * where the "Folder" has to be saved.
+		 * 
+		 * Parameters:
+		 * 
+		 * FolderDbxPath			:		Complete Dropbox Path of the Folder to be downloaded from Dropbox
+		 * TargetLocalPath			:		Absolute Local Path of the folder where the Folder has to be downloaded
+		 * 
 		 */
-		public void DbxDownloadFolder(String FolderDbxPath, String TargetLocalPath) throws DbxException {
+		public void DbxDownloadFolder(String FolderDbxPath, String TargetLocalPath) throws IOException, DbxException {
 			/*
-			 * Create the folder in the local machine
+			 * Create the folder in the local machine with last part of the of the FolderDbxPath i.e Folder's name
 			 */
 			String folderName = FolderDbxPath.substring(FolderDbxPath.lastIndexOf("/"));
 			TargetLocalPath += folderName;
 			boolean newFolder = new File(TargetLocalPath).mkdirs();
+			
 			if(!newFolder) {
+				return;
 			}
 			
 			/*
@@ -254,6 +306,14 @@ public class DbxUtility {
 			 if (folderInfo == null) {
 			    // IJ.error("No file or folder at that path.");
 			 } else {				 
+				 /*
+	        	 * Iterate for each child of the Folder and call,  
+	        	 * 
+	        	 * 1. DbxDownloadFile() function if the child is a file, otherwise
+	        	 * 
+	        	 * 2. DbxDownloadFolder() function if the child is a sub-folder.
+	        	 * 
+	        	 */
 				 iterChildren = folderInfo.children.iterator();
 				 @SuppressWarnings("unused")
 				 boolean tillEndOfDirectory = true;
@@ -266,6 +326,7 @@ public class DbxUtility {
 						try {
 							DbxDownloadFile(child.path, TargetLocalPath);
 						} catch (IOException e) {
+							e.printStackTrace();
 						}
 					}
 				 }
@@ -280,8 +341,9 @@ public class DbxUtility {
 	     * 
 	     * Parameters:
 	     * 
-	     * node		:	Parent node to which we have to add the child nodes.
-	     * name		:	name of the parent node 
+	     * node			:	Parent node to which we have to add the child nodes.
+	     * Treemodel	:	DefaultTreeModel of the JTree where these nodes are to be added
+	     * name			:	name of the parent node 
 	     *
 	     */
 	    public void addChildren(DefaultMutableTreeNode node, DefaultTreeModel Treemodel, String name) {
@@ -308,7 +370,9 @@ public class DbxUtility {
 				 DbxEntry child;
 				 while(tillEndOfDirectory=iterChildren.hasNext()) {
 					child = iterChildren.next();
+					// New child node to be added to the parent node
 					DefaultMutableTreeNode nodeChild = new DefaultMutableTreeNode(child.path);
+					// Add only unique nodes. In case, this function is called for the same parent node more than once
 					addUniqueNode(node, nodeChild, Treemodel);
 				 }
 			 }
@@ -321,8 +385,9 @@ public class DbxUtility {
 	     * 
 	     * Parameters:
 	     * 
-	     * node		:	Parent node to which we have to add the child nodes.
-	     * name		:	name of the parent node
+	     * node			:	Parent node to which we have to add the child nodes.
+	     * TreeModel	:	DefaultTreeModel of the JTree where this node has to be added.
+	     * name			:	name of the parent node
 	     * 
 	     * Note		:	The difference between this function is that it is used to add only those nodes which are "folder" type.	
 	     * 
@@ -351,16 +416,22 @@ public class DbxUtility {
 				 DbxEntry child;
 				 while(tillEndOfDirectory=iterChildren.hasNext()) {
 					child = iterChildren.next();
+					// Only add child node if it is a folder
 					if(child.isFolder()) {
+						// New child node to be added to the parent node
 						DefaultMutableTreeNode nodeChild = new DefaultMutableTreeNode(child.path);
+						// Add only unique nodes. In case, this function is called for the same parent node more than once
 						addUniqueNode(node, nodeChild, Treemodel);
 					}	
 				 }
 			 }
 	    }
 	    
+	    
 	    /*
 	     * This function only adds unique children nodes to the parent node.
+	     * 
+	     * Parameters:
 	     * 
 	     * parentNode		:		Node to which children has to be added
 	     * childNode		:		Node to be added to the parent Node
