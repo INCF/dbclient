@@ -27,6 +27,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.IOException;
+
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
@@ -43,6 +44,8 @@ import javax.swing.JTextField;
 import javax.swing.JTree;
 import javax.swing.border.Border;
 import javax.swing.border.TitledBorder;
+import javax.swing.event.TreeExpansionEvent;
+import javax.swing.event.TreeExpansionListener;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
@@ -97,7 +100,7 @@ public class MyCloudJ_ implements PlugIn {
 	/*
 	 * This holds the JTree node that is selected by the user for upload/download
 	 */
-	public Object node;
+	public Object node, parentNode;
 	
 	
 	/*
@@ -537,6 +540,10 @@ public class MyCloudJ_ implements PlugIn {
 					BoxLayout boxLayout = new BoxLayout(treeFrame.getContentPane(), BoxLayout.Y_AXIS);
 					treeFrame.setLayout(boxLayout);
 					
+					/*// Expand the JTree
+					for (int i = 0; i < DbxTree1.getRowCount(); i++) {
+						DbxTree1.expandRow(i);
+					}*/
 					
 					/*
 					 * JPanel for browsing frame
@@ -574,6 +581,10 @@ public class MyCloudJ_ implements PlugIn {
 						    
 						    // Add child nodes to this node(files and subfolders)
 						    obj.addChildren(parentNode, treeModel1, parentName);
+						    
+						    DbxTree1.expandPath(new TreePath(parentNode.getPath()));
+						    
+						    treeFrame.pack();
 						}
 					});
 			        
@@ -592,11 +603,25 @@ public class MyCloudJ_ implements PlugIn {
 			        	public void actionPerformed(ActionEvent e) {
 			        		// Get the latest node selected
 							node = DbxTree1.getLastSelectedPathComponent();
+							parentNode = ((DefaultMutableTreeNode) node).getParent();
 							
 							// Extract the name from the node and set the source address with its path
 						    String name;  
 						    name = (node == null) ? "NONE" : node.toString();
-						    srcTxt.setText(name);
+						    
+						    String suffix;
+						    suffix = (parentNode == null) ? "NONE" : parentNode.toString();
+						    
+						    if(name.startsWith("/")) {
+						    	srcTxt.setText(name);
+						    }
+						    else {
+						    	if(suffix.endsWith("/"))
+						    		name = suffix+name;
+						    	else
+						    		name = suffix+"/"+name;
+						    	srcTxt.setText(name);
+						    }
 						    
 						    // Extract the metadata of this file/folder
 						    DbxEntry metaData=null;
@@ -637,18 +662,33 @@ public class MyCloudJ_ implements PlugIn {
 			        		treeFrame.dispose();
 						}
 					});
+			        
+			        DbxTree1.addTreeExpansionListener(new TreeExpansionListener() {
+						@Override
+						public void treeExpanded(TreeExpansionEvent event) {
+							treeFrame.pack();
+						}
 
-
+						@Override
+						public void treeCollapsed(TreeExpansionEvent event) {
+							treeFrame.pack();
+						}
+			        });
+			        
+			        
 			        // This will position the JFrame in the center of the screen
 			        treeFrame.setLocationRelativeTo(null);
 			        treeFrame.setTitle("Dropbox - Browse!");
-			        treeFrame.setSize(350,150);
-					
+			        treeFrame.setSize(350,200);
+			        treeFrame.setResizable(true);
+			        // treeFrame.setMaximumSize(new Dimension(500,350));
+			        
 			        // Add DbxTree1(JTree) to this panel and in turn in treeFrame
 			        treePanel.add(DbxTree1);
 			        treeFrame.add(scroll);
 			        treeFrame.add(panel2);
 			        treeFrame.setVisible(true);
+			        treeFrame.pack();
 				}
 			}
 		});
@@ -692,6 +732,10 @@ public class MyCloudJ_ implements PlugIn {
 					BoxLayout boxLayout = new BoxLayout(treeFrame.getContentPane(), BoxLayout.Y_AXIS);
 					treeFrame.setLayout(boxLayout);
 					
+					/*// Expand the JTree
+					for (int i = 0; i < DbxTree2.getRowCount(); i++) {
+						DbxTree2.expandRow(i);
+					}*/
 					
 					/*
 					 * JPanel for browsing frame
@@ -729,6 +773,10 @@ public class MyCloudJ_ implements PlugIn {
 						    
 						    // Add child nodes to this node(only subfolders)
 						    obj.addChildrenFolder(parentNode, treeModel2, parentName);
+						    
+						    DbxTree2.expandPath(new TreePath(parentNode.getPath()));
+						    
+						    treeFrame.pack();
 						}
 					});
 			        
@@ -771,18 +819,34 @@ public class MyCloudJ_ implements PlugIn {
 							treeFrame.dispose();
 						}
 					});
+			        
+			        
+			        DbxTree2.addTreeExpansionListener(new TreeExpansionListener() {
+						@Override
+						public void treeExpanded(TreeExpansionEvent event) {
+							treeFrame.pack();
+						}
 
+						@Override
+						public void treeCollapsed(TreeExpansionEvent event) {
+							treeFrame.pack();
+						}
+			        });
+			        
 			        
 			        // This will position the JFrame in the center of the screen
 			        treeFrame.setLocationRelativeTo(null);
 			        treeFrame.setTitle("Dropbox - Browse!");
-			        treeFrame.setSize(350,150);
+			        treeFrame.setSize(350,200);
+			        treeFrame.setResizable(true);
+			        // treeFrame.setMaximumSize(new Dimension(500,350));
 					
 			        // Add DbxTree2(JTree) to this panel and in turn in treeFrame
 			        treePanel.add(DbxTree2);
 			        treeFrame.add(scroll);
 			        treeFrame.add(panel2);
 			        treeFrame.setVisible(true);
+			        treeFrame.pack();
 				}
 				// If user wants to Download(Download Radio button is selected), then target is the local machine, browse from local machine
 				else if(rButton2.isSelected()) {

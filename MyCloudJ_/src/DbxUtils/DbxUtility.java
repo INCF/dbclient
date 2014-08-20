@@ -371,9 +371,17 @@ public class DbxUtility {
 				 while(tillEndOfDirectory=iterChildren.hasNext()) {
 					child = iterChildren.next();
 					// New child node to be added to the parent node
-					DefaultMutableTreeNode nodeChild = new DefaultMutableTreeNode(child.path);
-					// Add only unique nodes. In case, this function is called for the same parent node more than once
-					addUniqueNode(node, nodeChild, Treemodel);
+					if(child.isFile()) {
+						String lastPart = DbxPath.getName(child.path);
+						DefaultMutableTreeNode nodeChild = new DefaultMutableTreeNode(lastPart);
+						// Add only unique nodes. In case, this function is called for the same parent node more than once
+						addUniqueNode(node, nodeChild, Treemodel);
+					}
+					else if(child.isFolder()){
+						DefaultMutableTreeNode nodeChild = new DefaultMutableTreeNode(child.path);
+						// Add only unique nodes. In case, this function is called for the same parent node more than once
+						addUniqueNode(node, nodeChild, Treemodel);
+					}
 				 }
 			 }
 	    }
